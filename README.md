@@ -33,15 +33,15 @@ Die Website öffnet eine separate Ansicht; das eigentliche Bildschirmteilen übe
 
 Alternative Einstiege: `?view=presenter` und `?view=audience`. Beide Fenster müssen dieselbe URL-Basis, denselben Browser und dasselbe Browserprofil verwenden (nicht ein privates und ein normales Fenster mischen). `BroadcastChannel` synchronisiert Folien, Simulation, eingeblendete Antworten und Schwarzbild; `localStorage` dient als Fallback und stellt die letzte Folie wieder her. Eine Verbindung zu fremden Geräten ist nicht vorgesehen. Pro Sitzung eine Referentenansicht verwenden.
 
-| Taste | Funktion |
-| --- | --- |
-| → / Leertaste / PageDown | Nächste Folie |
-| ← / PageUp | Vorherige Folie |
-| Home / End | Erste / letzte Folie |
-| N | Sprechtext ein-/ausblenden |
-| B | Zuschauerbild schwarz schalten / fortsetzen |
-| F | Vollbild im aktuellen Fenster |
-| ? | Hilfe |
+| Taste                    | Funktion                                    |
+| ------------------------ | ------------------------------------------- |
+| → / Leertaste / PageDown | Nächste Folie                               |
+| ← / PageUp               | Vorherige Folie                             |
+| Home / End               | Erste / letzte Folie                        |
+| N                        | Sprechtext ein-/ausblenden                  |
+| B                        | Zuschauerbild schwarz schalten / fortsetzen |
+| F                        | Vollbild im aktuellen Fenster               |
+| ?                        | Hilfe                                       |
 
 Sprechtext lässt sich direkt bearbeiten und wird nur lokal im Browser gespeichert. Er wird nicht an das Zuschauerfenster übertragen. Der Timer ist lokal zur Referentenansicht. Mit **Handout herunterladen** wird ein Markdown-Dokument mit Zusammenfassung, Fragen und Quellen erstellt; es verwendet die mitgelieferten Texte, keine lokalen Sprechtextänderungen.
 
