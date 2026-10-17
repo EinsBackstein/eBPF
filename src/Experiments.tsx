@@ -631,7 +631,7 @@ function NetworkScene({
         {stage === "reply" && (
           <path
             className="scene-path scene-reply"
-            d="M745 85 C610 85 600 150 485 150 L180 150"
+            d="M745 105 C610 105 600 178 485 178 L215 178 Q180 178 180 165"
           />
         )}
         {stage === "reply" && motion && (
@@ -639,7 +639,7 @@ function NetworkScene({
             <animateMotion
               dur="1.25s"
               fill="freeze"
-              path="M745 85 C610 85 600 150 485 150 L180 150"
+              path="M745 105 C610 105 600 178 485 178 L215 178 Q180 178 180 165"
             />
           </circle>
         )}
