@@ -34,7 +34,7 @@ export function sendPackets(lab, mode, count, random = Math.random) {
       action,
       reason,
       backend,
-      port: lab.port,
+      port: mode === "xdp" ? lab.port : 8080,
       client: lab.client,
     });
   }

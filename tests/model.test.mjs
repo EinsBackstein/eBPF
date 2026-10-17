@@ -49,6 +49,7 @@ test("counters and backend samples track events; blocked traffic never reaches b
   let lab = sendPackets(initialLab, "network", 20, () => 0.1);
   assert.equal(lab.a, 20);
   assert.equal(lab.pass, 20);
+  assert.ok(lab.events.every((event) => event.port === 8080));
   assert.equal(initialLab.sent, 0);
   lab = sendPackets({ ...lab, policy: true, client: "guest" }, "network", 20);
   assert.equal(lab.drop, 20);

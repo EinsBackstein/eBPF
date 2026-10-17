@@ -1,71 +1,88 @@
-# eBPF — Inside the kernel
+# eBPF im Linux-Netzwerk
 
-Eine interaktive Präsentationswebsite für das Referat **„eBPF: Netzwerkverkehr beobachten, verteilen und absichern“**. React 19, TypeScript und Vite; statische Website ohne Backend und ohne ChatGPT-Sites-Abhängigkeit.
+Eine Präsentation im Browser mit festem **16:9-Folienformat**, Referentenansicht und synchronisierter Zuschaueransicht. React 19, TypeScript und Vite; statisch und ohne Backend.
 
-## Lokal starten
+## Starten
 
-Node.js **22.12+** (oder 20.19+) und npm verwenden.
+Node.js **22.12+** (oder 20.19+) und npm:
 
 ```sh
 npm ci
 npm run dev
 ```
 
-Die ausgegebene lokale URL im Browser öffnen (standardmäßig `http://127.0.0.1:5173`).
+Die lokale URL öffnen (standardmäßig `http://127.0.0.1:5173`). Die Referentenansicht zeigt die aktuelle Folie links und den Sprechtext rechts. Die Folienübersicht wird über **Folien** geöffnet; es gibt keine Website-Navigation oder dauerhaft sichtbare Seitenleiste.
 
 ```sh
-npm test        # Entscheidungslogik, Zähler und Validierung des gespeicherten Zustands
-npm run build  # TypeScript-Prüfung + statischer Produktionsbuild nach dist/
+npm test
+npm run build
 npm run preview
 ```
 
-`dist/` kann bei einem beliebigen statischen Webhost bereitgestellt werden. Relative Assetpfade unterstützen auch Unterverzeichnisse. Es ist kein Hostingdienst vorkonfiguriert.
+Der Build liegt in `dist/` und kann bei einem statischen Webhost bereitgestellt werden. Relative Assetpfade unterstützen auch Unterverzeichnisse. Es ist kein Hostingdienst vorkonfiguriert.
 
-## Präsentieren auf dem MacBook
+## Auf dem MacBook präsentieren
 
-1. Unter **Systemeinstellungen → Displays** den zweiten Bildschirm als **erweiterten Bildschirm** verwenden.
-2. Website auf dem MacBook öffnen und **Präsentieren** anklicken. Popups für die lokale Website erlauben, falls der Browser sie blockiert.
-3. Das neue Zuschauerfenster auf den zweiten Bildschirm ziehen. Im Zuschauerfenster mit **F** Vollbild aktivieren; alternativ das Vollbild-Menü des Browsers verwenden.
-4. Auf dem MacBook bleiben Foliensteuerung, bearbeitbarer Sprechtext, Timer und eine Vorschau der nächsten Folie sichtbar. Im Zuschauerfenster werden Folie und synchronisierte Simulation angezeigt.
-5. In einer Videokonferenz **nur das Zuschauerfenster bzw. den zweiten Bildschirm** teilen.
+1. In macOS unter **Systemeinstellungen → Displays** den zweiten Bildschirm als **erweiterten Bildschirm** einstellen.
+2. **Präsentieren** anklicken. Das Zuschauerfenster auf den zweiten Bildschirm ziehen und dort mit **F** Vollbild aktivieren.
+3. Auf dem MacBook bleiben Foliensteuerung, Timer, Sprechtext und der Titel der nächsten Folie sichtbar.
+4. In einer Videokonferenz **nur das Zuschauerfenster oder den zweiten Bildschirm** teilen. Das Bildschirmteilen selbst übernimmt die Konferenz-App.
 
-Die Website öffnet eine separate Ansicht; das eigentliche Bildschirmteilen übernimmt macOS beziehungsweise die Konferenz-App. Das Verschieben auf einen externen Monitor erfolgt manuell und funktioniert damit auch ohne experimentelle Browser-APIs.
+Falls Popups blockiert werden, in der **Hilfe** die Zuschaueransicht als Tab öffnen. Direkte Einstiege: `?view=presenter` und `?view=audience`.
 
-Alternative Einstiege: `?view=presenter` und `?view=audience`. Beide Fenster müssen dieselbe URL-Basis, denselben Browser und dasselbe Browserprofil verwenden (nicht ein privates und ein normales Fenster mischen). `BroadcastChannel` synchronisiert Folien, Simulation, eingeblendete Antworten und Schwarzbild; `localStorage` dient als Fallback und stellt die letzte Folie wieder her. Eine Verbindung zu fremden Geräten ist nicht vorgesehen. Pro Sitzung eine Referentenansicht verwenden.
+Beide Fenster müssen dieselbe URL-Basis und dasselbe Browserprofil verwenden. `BroadcastChannel` synchronisiert Folien, Antworten, Simulationszustand und Schwarzbild. `localStorage` dient als Fallback und stellt die letzte Folie wieder her. Eine Verbindung zu fremden Geräten ist nicht vorgesehen; pro Sitzung nur eine Referentenansicht verwenden.
+
+## Sprechtext ohne Scrollen
+
+- Der Sprechtext hat einen festen Platz im Fenster und ist standardmäßig **22 CSS-Pixel** groß.
+- **A− / A+** ändern die Größe zwischen 18 und 30 Pixeln.
+- Die verfügbare Breite und Höhe werden gemessen. Längere Texte erscheinen in **Abschnitten**, die jeweils vollständig in den sichtbaren Bereich passen. Es gibt keine Scrollleiste im Sprechtext.
+- Mit **↑ / ↓** oder den Pfeilen unter dem Text zwischen Abschnitten wechseln. Beim Folienwechsel beginnt der Sprechtext wieder beim ersten Abschnitt.
+- Über das **Stiftsymbol** lässt sich der Text in einem separaten Dialog bearbeiten. Änderungen bleiben lokal im Browser und werden nicht an Zuschauer übertragen.
+- Auf schmalen Geräten stehen Folie und Sprechtext übereinander, jeweils in festen Bereichen.
 
 | Taste                    | Funktion                                    |
 | ------------------------ | ------------------------------------------- |
 | → / Leertaste / PageDown | Nächste Folie                               |
 | ← / PageUp               | Vorherige Folie                             |
+| ↑ / ↓                    | Sprechtextabschnitt zurück / weiter         |
 | Home / End               | Erste / letzte Folie                        |
 | N                        | Sprechtext ein-/ausblenden                  |
 | B                        | Zuschauerbild schwarz schalten / fortsetzen |
 | F                        | Vollbild im aktuellen Fenster               |
 | ?                        | Hilfe                                       |
 
-Sprechtext lässt sich direkt bearbeiten und wird nur lokal im Browser gespeichert. Er wird nicht an das Zuschauerfenster übertragen. Der Timer ist lokal zur Referentenansicht. Mit **Handout herunterladen** wird ein Markdown-Dokument mit Zusammenfassung, Fragen und Quellen erstellt; es verwendet die mitgelieferten Texte, keine lokalen Sprechtextänderungen.
+Die Zuschaueransicht zeigt ausschließlich die Folie. Sie wird proportional in das Fenster eingepasst, ohne dass Inhalte umgebrochen oder abgeschnitten werden. Bei abweichendem Bildschirmformat bleiben schwarze Ränder.
 
-## Interaktiver Praxisteil · erste Iteration
+## Folieninhalte
 
-**Alle angezeigten Ereignisse sind Browser-Simulationen. Die Website führt kein eBPF aus, misst keinen echten Netzwerkverkehr und steuert noch kein Linux-Labor.**
+15 Folien behandeln Grundprinzip, Laden und Ausführen, Verifier/JIT, Maps, Hooks, konkrete Unternehmenseinsätze, Versuchsaufbau, vier Praxisphasen, Testmatrix, Wiederholungsfragen und Quellen.
 
-- **A · Beobachten:** Verbindungen erzeugen und modellierte Entscheidungen ansehen.
-- **B · Verteilen:** Neue Verbindungen bekommen zufällig Backend A oder B. Es gibt keine garantierte 50:50-Verteilung.
-- **C · Absichern:** Ingress-Policy aktivieren, Client B blockieren, Client A als Kontrolle prüfen und die Policy wieder deaktivieren.
-- **D · XDP-Paketfilter:** Filter aktivieren. TCP/9090 wird verworfen, TCP/8080 bleibt erlaubt. PASS-/DROP-Zähler und Ereignislog verfolgen. Filter deaktivieren und Wiederherstellung prüfen.
+Die Texte erklären konkrete Abläufe und Beispiele. Folien und gesprochene Erläuterung sind getrennt. Über **Folien → Handout herunterladen** wird ein Markdown-Handout mit Folienpunkten, mitgelieferten Sprechtexten, drei Fragen mit Antworten und Quellen erzeugt. Lokale Sprechtextänderungen werden nicht in das Handout übernommen.
 
-Beim Wechsel zwischen dem XDP-Modell und den anderen Folien werden Simulationszustand und Zähler zurückgesetzt, damit keine Messgrößen vermischt werden. Die übrigen Praxisphasen teilen ihren Zustand. **Zurücksetzen** stellt jeweils den Ausgangszustand her.
+## Interaktive Simulation
 
-Der Pseudocode erklärt Verhalten und ist kein vollständiger Paketparser. XDP-Drops sind von Cilium-Policy-Drops getrennt. Das geplante reale k3d-/Cilium-/Hubble-Labor und der separate Generic-XDP-Versuch sind in [docs/INHALTSPLAN.md](docs/INHALTSPLAN.md) beschrieben und noch nicht implementiert.
+**Die Website führt kein eBPF aus und misst keinen echten Netzwerkverkehr.** Der k3d-/Cilium-/Hubble-Aufbau und der separate XDP-Versuch sind noch umzusetzen; die Planung steht in [docs/INHALTSPLAN.md](docs/INHALTSPLAN.md).
 
-## Inhalte anpassen
+Die Steuerung erscheint auf dem MacBook unter der aktuellen Praxisfolie:
 
-- `src/deck.ts`: Folien, Sprechtexte, Fragen und Primärquellen.
-- `src/App.tsx`: Ansichten, Synchronisierung und Interaktionen.
-- `src/model.mjs`: reine Simulations- und Zustandslogik.
-- `src/styles.css`: Gestaltung und responsive Layouts.
+- **A · Beobachten:** Neue Verbindungen erzeugen und Quelle, Entscheidung und Backend zuordnen.
+- **B · Lastverteilung:** Neue Verbindungen bekommen zufällig Backend A oder B; die Stichprobe muss nicht 50:50 sein.
+- **C · Netzwerkregel:** Nur Client A erlauben, Client B prüfen, Regel deaktivieren und Zugriff erneut prüfen.
+- **D · XDP-Portfilter:** 9090 sperren, TCP/9090 und TCP/8080 vergleichen, PASS-/DROP-Zähler verfolgen, Filter deaktivieren und wiederholen.
+
+Zwischen XDP-Modell und den übrigen Folien werden Zustand und Zähler zurückgesetzt, damit Paket- und Verbindungszähler nicht vermischt werden. Die übrigen Praxisphasen teilen ihren Zustand. **Zurücksetzen** stellt den Ausgangszustand her. XDP-Drops und Cilium-Policy-Drops beschreiben unterschiedliche Mechanismen.
+
+Die vereinfachte Portregel ist Pseudocode, kein vollständiger Paketparser. Im echten Versuch gehören Kontrollzugriff und Wiederherstellung zum Nachweis. Requests, Verbindungen und Pakete dürfen nicht gleichgesetzt werden.
+
+## Dateien
+
+- `src/deck.ts`: Folientitel, Stichpunkte, Sprechtexte, Fragen und Primärquellen.
+- `src/App.tsx`: feste Folienansicht, Referentenansicht, Pagination und Synchronisierung.
+- `src/model.mjs`: Simulations- und Zustandslogik.
+- `src/styles.css`: Darstellung und festes 1600 × 900-Folienraster.
 - `docs/`: ursprüngliche Referatsvorgaben und Inhaltsplan.
 
-Gestaltung inspiriert von [Cilium](https://cilium.io/) und [Cloudflare Docs](https://developers.cloudflare.com/); keine offizielle Verbindung. Schriftarten: DM Sans, Manrope, IBM Plex Mono (lokal gebündelt). Icons: Lucide.
+Schriftarten werden lokal gebündelt (DM Sans, IBM Plex Mono), Icons stammen von Lucide. Zum Präsentieren ist nach dem lokalen Start keine Internetverbindung erforderlich; externe Quellenlinks benötigen Internetzugang.
 
-Die mitgelieferte Planung sieht etwa 36 Minuten vor; die ursprünglichen Vorgaben nennen 25 Minuten. Zeitrahmen und die Verwendung einer Website anstelle von Folien vorab mit der Lehrperson abstimmen, wie in den Vorgaben festgehalten.
+Die ursprünglichen Vorgaben nennen 25 Minuten; die erweiterte Planung sieht etwa 36 Minuten vor. Zeitrahmen und Verwendung einer Website anstelle von Folien sind entsprechend den Vorgaben mit der Lehrperson abzustimmen.

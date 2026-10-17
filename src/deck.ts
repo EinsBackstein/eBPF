@@ -1,29 +1,29 @@
 export const sources = [
-  ["eBPF · Grundlagen", "https://ebpf.io/what-is-ebpf/"],
-  ["Linux · eBPF Verifier", "https://docs.kernel.org/bpf/verifier.html"],
+  ["eBPF: Funktionsweise und Maps", "https://ebpf.io/what-is-ebpf/"],
+  ["Linux: eBPF Verifier", "https://docs.kernel.org/bpf/verifier.html"],
   [
-    "Meta · Katran",
+    "Meta: Katran (2018)",
     "https://engineering.fb.com/2018/05/22/open-source/open-sourcing-katran-a-scalable-network-load-balancer/",
   ],
   [
-    "Netflix · Flow Logs",
+    "Netflix: Flow Exporter (2021)",
     "https://netflixtechblog.com/how-netflix-uses-ebpf-flow-logs-at-scale-for-network-insight-e3ea997dca96",
   ],
   [
-    "Cilium · Hubble",
+    "Cilium: Hubble",
     "https://docs.cilium.io/en/stable/observability/hubble/index.html",
   ],
   [
-    "Cilium · Socket Load Balancing",
+    "Cilium: Socket Load Balancing",
     "https://docs.cilium.io/en/stable/network/kubernetes/kubeproxy-free/",
   ],
-  ["XDP · Hands-on Tutorial", "https://github.com/xdp-project/xdp-tutorial"],
+  ["XDP: Praktisches Tutorial", "https://github.com/xdp-project/xdp-tutorial"],
   [
-    "Cloudflare · DDoS-Abwehr",
+    "Cloudflare: L4Drop / DDoS-Abwehr (2024)",
     "https://blog.cloudflare.com/how-cloudflare-auto-mitigated-world-record-3-8-tbps-ddos-attack/",
   ],
   [
-    "Microsoft · Azure CNI / Cilium",
+    "Microsoft: Azure CNI mit Cilium",
     "https://learn.microsoft.com/en-us/azure/aks/network-policy-best-practices",
   ],
 ];
@@ -32,259 +32,233 @@ export type Slide = {
   short: string;
   section: string;
   time: string;
-  label: string;
-  description: string;
   notes: string;
   kind: string;
   sourceIds: number[];
-  items?: [string, string][];
+  bullets: string[];
 };
 export const slides: Slide[] = [
   {
-    title: "Kleine Programme. Große Wirkung.",
-    short: "Inside the kernel",
-    section: "Einstieg",
+    title: "eBPF im Linux-Netzwerk",
+    short: "Thema und Ablauf",
+    section: "Einleitung",
     time: "01:00",
-    label: "LINUX NETWORKING, NEU GEDACHT",
-    description:
-      "Netzwerkverkehr beobachten, verteilen und absichern. Direkt dort, wo er entsteht.",
-    notes:
-      "Einstieg: Ein Webdienst ist langsam oder nicht erreichbar. Wer spricht mit wem? Welcher Server antwortet? Wer blockiert die Verbindung? Diese drei Fragen ziehen sich durch den Vortrag. eBPF gibt uns Sichtbarkeit und Entscheidungsmöglichkeiten direkt an Ereignissen im Linux-Kernel.",
-    kind: "intro",
+    kind: "title",
     sourceIds: [0],
-  },
-  {
-    title: "Was wäre, wenn der Kernel erweiterbar wäre?",
-    short: "Was ist eBPF?",
-    section: "Grundlagen",
-    time: "02:00",
-    label: "01 / DIE GRUNDIDEE",
-    description:
-      "Eingeschränkte Programme reagieren auf definierte Ereignisse im Linux-Kernel — ohne dessen Quellcode für jede Aufgabe zu ändern.",
-    notes:
-      "Userspace: Dort laufen Browser, Python und unsere Anwendung. Der Kernel vermittelt zwischen Anwendungen und Hardware. eBPF-Programme laufen an definierten Hooks. Die Technologie stammt aus der Paketfilterung, ist heute aber breiter einsetzbar. Normales Python oder TypeScript läuft dabei nicht im Kernel.",
-    kind: "concept",
-    sourceIds: [0],
-    items: [
-      ["Userspace", "Anwendungen, Konfiguration und Auswertung."],
-      ["eBPF", "Kleine, ereignisgesteuerte Programme."],
-      ["Linux-Kernel", "Definierte Hooks statt beliebiger Eingriffe."],
+    bullets: [
+      "Wie führt Linux eBPF-Programme aus?",
+      "Wie nutzen Unternehmen eBPF im Netzwerk?",
+      "Wie lassen sich Verbindungen verteilen und Pakete filtern?",
     ],
+    notes:
+      "Bei einem Webdienst können drei unterschiedliche Probleme auftreten: Wir wissen nicht, wer zugreift, ein Backend bekommt zu viel Last oder unerwünschter Verkehr erreicht den Dienst.\n\nWir klären zuerst, wie eBPF im Kernel arbeitet. Danach sehen wir konkrete Einsätze bei Unternehmen. Im Praxisteil untersuchen wir Verbindungen, Lastverteilung und einen Portfilter. Die interaktive Demo dieser Website ist zunächst eine Simulation.",
   },
   {
-    title: "Vom Programm zum Ereignis.",
-    short: "Hooks & Lebenszyklus",
+    title: "Was ist eBPF?",
+    short: "Grundprinzip",
     section: "Grundlagen",
     time: "02:00",
-    label: "02 / DER LEBENSZYKLUS",
-    description:
-      "Ein Programm wird vorbereitet, geprüft und an einen Hook gebunden. Erst das passende Ereignis löst es aus.",
+    kind: "definition",
+    sourceIds: [0],
+    bullets: [
+      "Linux lädt eBPF-Bytecode und prüft ihn vor der Ausführung.",
+      "Ein Hook legt fest, bei welchem Ereignis das Programm läuft.",
+      "Maps speichern Regeln, Zustand und Messwerte.",
+    ],
     notes:
-      "Den Ablauf einmal von links nach rechts erklären. Bytecode laden, Verifier-Prüfung, gegebenenfalls JIT-Übersetzung, Hook anbinden. Ein eintreffendes Paket oder ein neuer Verbindungsaufbau kann die Ausführung auslösen. Der Hook bestimmt den verfügbaren Kontext.",
+      "eBPF stammt vom Berkeley Packet Filter ab. Ursprünglich ging es um Paketfilterung; heute werden auch andere Kernelereignisse unterstützt.\n\nEin eBPF-Programm wird als Bytecode geladen und vor der Ausführung geprüft. Es läuft an einem festgelegten Hook, etwa bei einem Netzwerkereignis. Dafür bauen wir den Kernel nicht neu. Python übernimmt in unserem Aufbau Anwendung und Steuerung; es läuft nicht als Python-Code im Kernel.",
+  },
+  {
+    title: "Laden und Ausführen eines eBPF-Programms",
+    short: "Programmablauf",
+    section: "Grundlagen",
+    time: "02:00",
     kind: "lifecycle",
     sourceIds: [0, 1],
-  },
-  {
-    title: "Geprüft heißt nicht unfehlbar.",
-    short: "Verifier, JIT & Grenzen",
-    section: "Grundlagen",
-    time: "02:00",
-    label: "03 / SICHERHEIT & LAUFZEIT",
-    description:
-      "Der Verifier prüft die Zulässigkeit. Der JIT übersetzt auf unterstützten Systemen in Maschinencode.",
-    notes:
-      "Beispiel: Vor dem Lesen eines Paketheaders muss das Programm nachweisen, dass die Daten vorhanden sind. Ein zulässiges Programm kann trotzdem den falschen Port sperren. Der Verifier prüft keine fachliche Absicht. Overhead, Berechtigungen und unterstützte Kernelmerkmale bleiben wichtig.",
-    kind: "cards",
-    sourceIds: [0, 1],
-    items: [
-      [
-        "Verifier",
-        "Prüft unter anderem Speicherzugriffe und den Programmablauf.",
-      ],
-      ["JIT", "Übersetzt Bytecode auf unterstützten Systemen in nativen Code."],
-      [
-        "Grenzen",
-        "Falsche Regeln, Laufzeitaufwand und Kernelabhängigkeiten bleiben.",
-      ],
+    bullets: [
+      "Beim Laden: Der Verifier prüft das Programm; der JIT übersetzt es, wenn unterstützt.",
+      "Beim Anbinden: Der Hook bestimmt Ereignis und verfügbaren Kontext.",
+      "Zur Laufzeit: Ein passendes Ereignis löst die Ausführung aus.",
     ],
+    notes:
+      "Wir trennen das Laden vom späteren Ausführen. Beim Laden prüft der Verifier den Bytecode. Auf unterstützten Systemen übersetzt der JIT ihn in Maschinencode. Danach wird das Programm an einen Hook gebunden.\n\nBeispiel: Ein Programm hängt am XDP-Hook eines Interfaces. Sobald dort ein Paket ankommt, bekommt es dessen Kontext und liefert eine Entscheidung. Das Programm wird nicht für jedes Paket neu geladen.",
   },
   {
-    title: "Maps verbinden beide Welten.",
-    short: "Maps & Userspace",
+    title: "Verifier und JIT haben unterschiedliche Aufgaben",
+    short: "Verifier und JIT",
     section: "Grundlagen",
     time: "02:00",
-    label: "04 / GEMEINSAMER ZUSTAND",
-    description:
-      "Konfiguration hinein. Messwerte heraus. Maps halten Daten für eBPF-Programme und Werkzeuge im Userspace.",
+    kind: "verifier",
+    sourceIds: [0, 1],
+    bullets: [
+      "Verifier: Sind Speicherzugriffe und Programmablauf zulässig?",
+      "JIT: Bytecode in Maschinencode für die CPU übersetzen.",
+      "Die fachliche Regel prüft keiner von beiden: Ein falscher Port bleibt ein falscher Port.",
+    ],
     notes:
-      "Eine Map ist zum Beispiel eine Backend-Tabelle, eine erlaubte Quelle oder ein Aktionszähler. Python kann über Werkzeuge und APIs konfigurieren und auswerten. Das Kernelprogramm verarbeitet das Ereignis. Diese Trennung ist in unserer Praxis wichtig.",
+      "Ein Paket kann kürzer sein als erwartet. Bevor ein Programm einen Header liest, muss es nachweisen, dass die benötigten Bytes vorhanden sind. Solche Bedingungen verfolgt der Verifier.\n\nDer JIT hat eine andere Aufgabe: Er übersetzt Bytecode in Maschinencode. Beide entscheiden nicht, ob unsere Filterregel fachlich richtig ist. Sperren wir versehentlich Port 8080 statt 9090, kann das Programm trotzdem zulässig sein.",
+  },
+  {
+    title: "Maps: Regeln setzen und Zähler auslesen",
+    short: "eBPF-Maps",
+    section: "Grundlagen",
+    time: "02:00",
     kind: "maps",
     sourceIds: [0],
-    items: [
-      ["Konfiguration", "Welche Ports sind erlaubt?"],
-      ["Zustand", "Welches Backend gehört zur Verbindung?"],
-      ["Messwerte", "Wie oft wurde PASS oder DROP entschieden?"],
+    bullets: [
+      "Userspace schreibt die Regel: TCP-Zielport 9090 sperren.",
+      "Das eBPF-Programm liest die Regel und aktualisiert Aktionszähler.",
+      "Userspace liest PASS und DROP aus, ohne das Programm neu zu laden.",
     ],
+    notes:
+      "Maps sind Datenstrukturen, auf die eBPF-Programme und Anwendungen im Userspace zugreifen können. In unserem Beispiel enthalten sie einen gesperrten Port und zwei Zähler.\n\nPython schreibt die Portregel über ein Werkzeug oder eine API. Das Kernelprogramm liest die Regel bei der Paketverarbeitung und erhöht den passenden Zähler. Python liest die Werte wieder aus. Die angezeigten Zahlen sind ein Beispiel mit fünf Paketen, keine Messung am MacBook.",
   },
   {
-    title: "Der Hook macht den Unterschied.",
-    short: "Wo eBPF arbeitet",
+    title: "Wichtige Hooks für Netzwerkaufgaben",
+    short: "Hooks im Vergleich",
     section: "Grundlagen",
     time: "02:00",
-    label: "05 / EINSATZPUNKTE",
-    description:
-      "Gleiche Technologie. Unterschiedlicher Zeitpunkt, Kontext und Handlungsspielraum.",
-    notes:
-      "Tracepoints beobachten Ereignisse. Socket-Hooks können an Verbindungsentscheidungen beteiligt sein. TC verarbeitet Pakete. Native XDP läuft früh im Treiberpfad; Generic XDP später auf Socket Buffers. Cilium ist nicht gleich XDP. Unsere Demo verwendet ein separates Modell für den XDP-Portfilter.",
     kind: "hooks",
     sourceIds: [0, 5, 6],
-    items: [
-      ["XDP", "Früh im Empfangspfad · PASS / DROP"],
-      ["TC", "Paketverarbeitung am Netzwerkinterface"],
-      ["Socket", "Entscheidungen rund um Verbindungen"],
-      ["Tracepoint", "Ereignisse beobachten und auswerten"],
+    bullets: [
+      "Der Hook bestimmt, welche Daten ein Programm sieht und welche Aktionen möglich sind.",
+      "Cilium nutzt mehrere Hooks. Eine Cilium-Netzwerkregel ist nicht automatisch ein XDP-Filter.",
     ],
-  },
-  {
-    title: "Aus dem Kernel. In die Praxis.",
-    short: "eBPF in Produktion",
-    section: "Einsatz",
-    time: "03:00",
-    label: "06 / ECHTE EINSATZGEBIETE",
-    description:
-      "Große Unternehmen nutzen eBPF für konkrete Aufgaben im Netzwerkbetrieb.",
     notes:
-      "Keine reine Logosammlung: Meta nutzt Katran für Lastverteilung. Netflix dokumentiert Flow Exporter für TCP-Flows. Azure CNI powered by Cilium stellt einen eBPF-Datenpfad bereit. Cloudflare dokumentiert L4Drop für Angriffsabwehr. Es geht um diese Systeme, nicht um pauschale Aussagen über die gesamte Infrastruktur.",
-    kind: "companies",
-    sourceIds: [2, 3, 7, 8],
-    items: [
-      ["Meta", "Katran · Lastverteilung mit eBPF und XDP"],
-      ["Netflix", "Flow Exporter · TCP-Verbindungen verstehen"],
-      ["Microsoft Azure", "Cilium-Datenpfad · Netzwerk und Policies"],
-      ["Cloudflare", "L4Drop · Angriffsverkehr früh verwerfen"],
-    ],
+      "Ein Hook ist der Einsatzpunkt eines Programms. XDP verarbeitet eingehende Pakete. Socket-Hooks können bei einem Verbindungsaufbau ein Service-Ziel auf ein Backend umsetzen. TC arbeitet an der Paketverarbeitung eines Interfaces. Tracepoints liefern Ereignisse zum Beobachten.\n\nDiese Tabelle ist kein Paketablauf von oben nach unten. Es sind unterschiedliche Einsatzpunkte. Native XDP läuft im Treiberpfad; unser geplanter separater Linux-Versuch verwendet Generic XDP.",
   },
   {
-    title: "Ein Dienst. Drei Perspektiven.",
-    short: "Unser Labor",
+    title: "Dokumentierte eBPF-Einsätze bei Unternehmen",
+    short: "Produktionseinsätze",
+    section: "Anwendungen",
+    time: "03:00",
+    kind: "companies",
+    sourceIds: [2, 3, 8, 7],
+    bullets: [
+      "Die Beispiele bezeichnen konkrete Systeme und dokumentierte Einsätze.",
+    ],
+    notes:
+      "Meta hat Katran als Netzwerk-Load-Balancer mit eBPF und XDP veröffentlicht. Netflix beschreibt einen Flow Exporter, der TCP-Flows über eBPF-Tracepoints erfasst.\n\nMicrosoft bietet Azure CNI powered by Cilium für AKS an. Cloudflare dokumentiert L4Drop für die DDoS-Abwehr. Wir betrachten also Lastverteilung, Beobachtung und Zugriffskontrolle. Daraus folgt nicht, dass die gesamte Infrastruktur dieser Unternehmen denselben Mechanismus verwendet.",
+  },
+  {
+    title: "Versuchsaufbau: ein Service, zwei Backends",
+    short: "Versuchsaufbau",
     section: "Praxis",
     time: "01:00",
-    label: "07 / DER VERSUCHSAUFBAU",
-    description:
-      "Zwei Clients, eine Service-Adresse und zwei Python-Backends. Beobachten, verteilen, absichern.",
-    notes:
-      "Der geplante echte Aufbau: k3d in einer Linux-VM, Cilium und Hubble. Clients im Cluster sprechen den internen Service an. Python erzeugt Requests und zeigt Backend-Namen. Die Website simuliert zunächst die Effekte; sie führt keine eBPF-Programme aus. Den vorbereiteten Linux-Aufbau separat zeigen.",
     kind: "topology",
     sourceIds: [4, 5],
+    bullets: [
+      "Client A und Client B greifen auf dieselbe Service-Adresse zu.",
+      "Jedes Python-Backend antwortet mit seinem eigenen Namen.",
+      "Geplant für Linux: k3d + Cilium + Hubble; XDP in einem separaten Testnetz.",
+    ],
+    notes:
+      "Die beiden Clients sprechen dieselbe Service-Adresse an. Hinter ihr stehen zwei Python-Webserver. Die Antwort enthält den Backend-Namen, damit wir erkennen, welcher Server eine Anfrage bedient hat.\n\nIm geplanten Linux-Labor übernimmt Cilium den Datenpfad und Hubble zeigt die Flows. Die Website bildet diese Effekte bisher im Browser nach. Der eigene XDP-Portfilter gehört in ein separates Testnetz und wird nicht in den Cilium-Datenpfad eingebaut.",
   },
   {
-    title: "Wer spricht mit wem?",
+    title: "A: Verbindungen beobachten",
     short: "A · Beobachten",
     section: "Praxis",
     time: "03:00",
-    label: "PRAXIS A / OBSERVABILITY",
-    description:
-      "Erzeuge neue Verbindungen und verfolge ihren Weg vom Client zum Backend.",
-    notes:
-      "Simulation deutlich benennen. Im echten Labor Hubble-Service-Map und Flowdetails zeigen. Backend-Antworten identifizieren den bedienenden Prozess. Die Service-Map muss dafür nicht jedes Backend getrennt darstellen. Beobachtete Requests sind nicht gleich Paketzähler.",
     kind: "lab",
     sourceIds: [4],
+    bullets: [
+      "Neue Verbindung erzeugen → Client, Entscheidung und Backend zuordnen.",
+      "Im Linux-Labor: Backend-Antwort und passenden Hubble-Flow vergleichen.",
+    ],
+    notes:
+      "Ich erzeuge jetzt eine neue Verbindung von Client A. Im Modell sehen wir die Entscheidung und das ausgewählte Backend. Mit Client B wiederholen wir den Versuch.\n\nIm echten Labor würden wir zusätzlich die HTTP-Antwort und die Hubble-Flowdetails vergleichen. Die Antwort nennt den tatsächlich bedienenden Backend-Prozess. Die Browserereignisse sind simuliert und belegen noch keine Kommunikation in einer Linux-VM.",
   },
   {
-    title: "Eine Adresse. Mehrere Backends.",
-    short: "B · Verteilen",
+    title: "B: Neue Verbindungen auf Backends verteilen",
+    short: "B · Lastverteilung",
     section: "Praxis",
     time: "04:00",
-    label: "PRAXIS B / LOAD BALANCING",
-    description:
-      "Neue TCP-Verbindungen können bei unterschiedlichen Backends landen. Eine kleine Stichprobe muss nicht 50:50 sein.",
-    notes:
-      "Im echten Versuch neue TCP-Verbindungen erzeugen und die Backend-Namen zählen. Die Simulation wählt beispielhaft zufällig. HTTP-Anfragen auf einer bestehenden Verbindung bedeuten keine neue Backend-Auswahl. Ciliums Socket-LB und XDP-Beschleunigung unterscheiden.",
     kind: "lab",
     sourceIds: [5],
+    bullets: [
+      "Zehn neue Verbindungen erzeugen und die Backend-Antworten zählen.",
+      "Mehrere HTTP-Anfragen auf derselben TCP-Verbindung bedeuten keine neue Backend-Auswahl.",
+    ],
+    notes:
+      "Jetzt erzeugen wir mehrere neue Verbindungen an dieselbe Service-Adresse. Die Backend-Namen werden gezählt. Das Modell wählt zufällig; eine kleine Stichprobe muss nicht genau zur Hälfte auf beide Backends fallen.\n\nWichtig ist die neue TCP-Verbindung. Mehrere HTTP-Anfragen können eine bestehende Verbindung weiterverwenden und beim selben Backend bleiben. Im Linux-Labor müssen wir deshalb neue Verbindungen und die tatsächlichen Antworten kontrollieren.",
   },
   {
-    title: "Zugriff ist eine Entscheidung.",
-    short: "C · Absichern",
+    title: "C: Zugriff mit einer Netzwerkregel begrenzen",
+    short: "C · Netzwerkregel",
     section: "Praxis",
     time: "05:00",
-    label: "PRAXIS C / NETWORK POLICY",
-    description:
-      "Erlaube den vorgesehenen Client. Blockiere den zweiten. Prüfe anschließend die Wiederherstellung.",
-    notes:
-      "Policy aktivieren und neue Verbindungen beider Clients testen. Im echten Labor auf bestätigte Policy-Übernahme warten. Hubble-Drop mit Policy-Grund zeigen. Danach Regel zurücknehmen und beide Clients erneut testen. Das ist Netzwerksicherheit, keine Anmeldung der HTTP-Anwendung.",
     kind: "lab",
     sourceIds: [4, 5],
+    bullets: [
+      "Regel aktiv: Nur Client A darf den Webdienst erreichen.",
+      "Client B testen → Regel entfernen → Zugriff erneut testen.",
+    ],
+    notes:
+      "Ohne Regel dürfen beide Clients zugreifen. Ich aktiviere jetzt die modellierte Ingress-Regel und teste Client B: Seine neue Verbindung wird blockiert. Client A bleibt als Kontrollfall erlaubt.\n\nDanach nehme ich die Regel zurück und teste Client B erneut. Im echten Labor warten wir auf die Policy-Übernahme und suchen den passenden Hubble-Drop. Diese Regel kontrolliert Netzwerkzugriff; sie ersetzt keine Anmeldung in der Webanwendung.",
   },
   {
-    title: "Entscheiden, bevor es weitergeht.",
-    short: "D · XDP-Paketfilter",
+    title: "D: TCP-Port 9090 mit XDP filtern",
+    short: "D · XDP-Portfilter",
     section: "Praxis",
     time: "03:00",
-    label: "PRAXIS D / XDP IM DETAIL",
-    description:
-      "TCP/9090 blockieren. TCP/8080 weiterreichen. Jede Entscheidung in den Maps nachvollziehen.",
-    notes:
-      "Interaktive Browser-Simulation: Port wählen, Filter aktivieren, Pakete senden und Zähler ansehen. Im geplanten echten Versuch separates veth-Testnetz in Linux, Generic-/SKB-XDP und Maps über Python/bpftool. XDP-Drops dieses Versuchs sind keine Hubble-Policy-Drops. Die einfache Regel ist Pseudocode und lässt Parser-Prüfungen aus.",
     kind: "lab",
     sourceIds: [6],
-  },
-  {
-    title: "Was der Versuch wirklich zeigt.",
-    short: "Auswertung & Grenzen",
-    section: "Abschluss",
-    time: "01:00",
-    label: "08 / EINORDNUNG",
-    description:
-      "Ein beobachteter Effekt ist nur dann ein Nachweis, wenn wir ihn dem richtigen Mechanismus zuordnen.",
-    notes:
-      "Requests, TCP-Verbindungen und Pakete unterscheiden. Retransmits können mehrere Drops verursachen. Eine Antwort belegt bediente Kommunikation, ein Auswahlereignis allein noch keinen Erfolg. Die Browser-Simulation ist ein Erklärmodell und ersetzt keine technische Linux-Vorprobe.",
-    kind: "cards",
-    sourceIds: [4, 5, 6],
-    items: [
-      ["Beobachten", "Flow-Ereignisse und erfolgreiche Antworten vergleichen."],
-      ["Verteilen", "Neue Verbindungen und Backend-Antworten auswerten."],
-      ["Absichern", "Vorher, Einschränkung und Wiederherstellung testen."],
+    bullets: [
+      "Filter aktiv: TCP/9090 → DROP; TCP/8080 → PASS.",
+      "Filter deaktivieren und die Erreichbarkeit erneut prüfen.",
     ],
+    notes:
+      "Hier wechseln wir zum separaten XDP-Modell. Zuerst sende ich ohne Filter an Port 9090. Dann aktiviere ich die Regel: Weitere Pakete an 9090 werden verworfen und der DROP-Zähler steigt.\n\nPort 8080 bleibt als Kontrollport erlaubt. Nach dem Deaktivieren muss auch 9090 wieder durchgelassen werden. Im Linux-Versuch würden wir die beiden Dienste und Map-Zähler prüfen. Diese XDP-Drops sind keine Hubble-Policy-Drops.",
   },
   {
-    title: "Drei Gedanken zum Mitnehmen.",
-    short: "Fazit & Fragen",
+    title: "Welche Ergebnisse müssen wir nachweisen?",
+    short: "Testmatrix und Grenzen",
+    section: "Auswertung",
+    time: "01:00",
+    kind: "results",
+    sourceIds: [4, 5, 6],
+    bullets: [
+      "Eine Browser-Simulation ersetzt keinen Test des Linux-Datenpfads.",
+      "HTTP-Anfragen, TCP-Verbindungen und Pakete sind unterschiedliche Messgrößen.",
+    ],
+    notes:
+      "Die Versuche brauchen jeweils einen passenden Nachweis. Für Lastverteilung vergleichen wir Antworten auf neue Verbindungen. Für Filterung brauchen wir einen vorher erfolgreichen Zugriff, einen passenden Drop und einen weiterhin erlaubten Kontrollzugriff.\n\nNach dem Entfernen der Regel prüfen wir die Wiederherstellung. Ein fehlgeschlagener Verbindungsversuch kann mehrere verworfene Pakete erzeugen, etwa durch Wiederholungen. Deshalb setzen wir Requests, Verbindungen und Paketzähler nicht gleich.",
+  },
+  {
+    title: "Fragen zur Wiederholung",
+    short: "Fragen und Diskussion",
     section: "Abschluss",
     time: "05:00",
-    label: "09 / TAKEAWAYS & DISKUSSION",
-    description:
-      "eBPF erweitert Sichtbarkeit und Entscheidungen. Der Hook bestimmt die Möglichkeiten.",
-    notes:
-      "Drei Kernaussagen zusammenfassen. Anschließend Diskussionsfragen verwenden. 1: Hooks, Verifier, JIT, Maps erklären. 2: Zwei belegte Produktionseinsätze nennen. 3: Warum neue TCP-Verbindungen zum Prüfen der Lastverteilung, und wie Filterung nachweisen? Die Antworten lassen sich auf dieser Folie einzeln einblenden.",
     kind: "questions",
     sourceIds: [0, 1, 2, 3],
+    bullets: [],
+    notes:
+      "Diese drei Fragen fassen die Lernziele zusammen. Bei der ersten geht es um die Bausteine der Technologie. Bei der zweiten müssen Unternehmen, System und Aufgabe zusammenpassen.\n\nBei der dritten ist der Unterschied zwischen einer HTTP-Anfrage und einer TCP-Verbindung entscheidend. Die Antworten lassen sich einzeln einblenden. Für die Filterung gehören Kontrollzugriff und Wiederherstellung zum Nachweis dazu.",
   },
   {
-    title: "Zum Weiterdenken. Und Nachlesen.",
-    short: "Quellen & Referenzen",
-    section: "Abschluss",
+    title: "Quellen",
+    short: "Quellen",
+    section: "Anhang",
     time: "—",
-    label: "REFERENZEN",
-    description:
-      "Primärquellen zu Technologie, Produktionsanwendungen und dem geplanten Labor.",
-    notes:
-      "Referenzen sind auch im Handout enthalten. Der Stand des mitgelieferten Inhaltsplans ist der 17. Oktober 2026. Historische Unternehmensbeispiele sind als dokumentierte Einsätze zu verstehen. Handout vorab verteilen.",
     kind: "sources",
-    sourceIds: sources.map((_, i) => i),
+    sourceIds: [],
+    bullets: [],
+    notes:
+      "Die Quellen sind direkt verlinkt und stehen zusätzlich im herunterladbaren Handout. Die Unternehmensbeispiele beziehen sich auf die genannten Veröffentlichungen beziehungsweise die verlinkte Produktdokumentation.\n\nFür den noch ausstehenden Linux-Aufbau müssen wir eine funktionierende Versionskombination und die ausgeführten Tests dokumentieren. Die interaktive Website liefert dafür bislang ein Erklärmodell, keine gemessenen Ergebnisse.",
   },
 ];
 export const questions = [
   [
-    "Welche Aufgaben haben Hooks, Verifier, JIT und Maps?",
-    "Hooks bestimmen Zeitpunkt und Kontext. Der Verifier prüft die Zulässigkeit. Der JIT übersetzt auf unterstützten Systemen Bytecode in Maschinencode. Maps speichern Konfiguration, Zustand und Messwerte.",
+    "Welche Aufgaben haben Hook, Verifier, JIT und Maps?",
+    "Hook: Ereignis und Kontext. Verifier: Zulässigkeit prüfen. JIT: in Maschinencode übersetzen. Maps: Regeln, Zustand und Messwerte speichern.",
   ],
   [
-    "Nenne zwei konkrete Produktionseinsätze.",
-    "Meta/Katran verteilt Netzwerkverkehr mit eBPF/XDP. Netflix/Flow Exporter erfasst TCP-Flows für Netzwerkeinblicke. Weitere Beispiele: Cloudflare/L4Drop und Azure CNI powered by Cilium.",
+    "Nenne zwei Unternehmen, das jeweilige System und dessen Aufgabe.",
+    "Meta / Katran: Netzwerk-Lastverteilung mit eBPF und XDP. Netflix / Flow Exporter: TCP-Flows für Netzwerkeinblicke erfassen.",
   ],
   [
-    "Warum prüfen wir neue TCP-Verbindungen?",
-    "Viele HTTP-Anfragen können dieselbe Verbindung nutzen. Erst neue Verbindungen zeigen neue Backend-Auswahl. Filterung prüfen wir mit Vorher-/Nachher-Tests, passenden Drops, erlaubtem Kontrollzugriff und Wiederherstellung.",
+    "Warum erzeugt der Lastverteilungstest neue TCP-Verbindungen?",
+    "Mehrere HTTP-Anfragen können eine Verbindung teilen und dadurch beim selben Backend bleiben. Neue Verbindungen ermöglichen eine neue Backend-Auswahl.",
   ],
 ];
