@@ -1,96 +1,79 @@
 # eBPF im Linux-Netzwerk
 
-Eine Präsentation im Browser mit festem **16:9-Folienformat**, Referentenansicht und synchronisierter Zuschaueransicht. React 19, TypeScript und Vite; statisch und ohne Backend.
+Eine Präsentationswebsite mit festem 16:9-Format, großen Referentennotizen und synchronisierter Zuschaueransicht. React, TypeScript und Vite. Der Praxisteil verbindet echte Python-/YAML-Dateien mit einem lokalen **k3d + Cilium + Hubble**-Labor.
 
-## Starten
+## Start
 
-Node.js **22.12+** (oder 20.19+) und npm:
+Node.js 22.12+ und npm:
 
 ```sh
 npm ci
 npm run dev
 ```
 
-Die lokale URL öffnen (standardmäßig `http://127.0.0.1:5173`). Die Referentenansicht zeigt die aktuelle Folie links und den Sprechtext rechts. Die Folienübersicht wird über **Folien** geöffnet; es gibt keine Website-Navigation oder dauerhaft sichtbare Seitenleiste.
+Öffnen: http://127.0.0.1:5173/. Die Folien funktionieren auch ohne Labor; Ausführungsbuttons sind dann deaktiviert und als offline gekennzeichnet. Es gibt keine simulierten Ersatzresultate.
+
+Für das Linux-Labor zusätzlich Docker, k3d, kubectl, Helm, Python 3 und curl bereitstellen. Docker Desktop stellt auf macOS den Linux-Kernel zur Verfügung.
+
+```sh
+npm run lab:setup
+```
+
+Anschließend in einem zweiten Terminal:
+
+```sh
+npm run lab
+```
+
+Das startet die lokale Befehlsbrücke und Portweiterleitungen. Hubble UI: http://127.0.0.1:12000/?namespace=ebpf-talk. Einrichtung, Ablauf und technische Grenzen stehen in [lab/README.md](lab/README.md).
+
+## Präsentieren auf zwei Displays
+
+1. macOS auf **erweiterten Bildschirm** stellen.
+2. In der Website **Präsentieren** wählen.
+3. Das Zuschauerfenster auf den externen Bildschirm ziehen und dort **F** drücken.
+4. Das MacBook behält die Referentenansicht mit Sprechtext und Laborsteuerung.
+
+Bei einer Videokonferenz das Zuschauerfenster in der Konferenzsoftware teilen. Die Website selbst zeichnet den Desktop nicht auf.
+
+Notizen sind standardmäßig 22 CSS-Pixel groß, mit A−/A+ von 18 bis 30 einstellbar. Lange Texte werden in sichtbare Abschnitte aufgeteilt. Notizen lassen sich bearbeiten und bleiben lokal gespeichert. Beide Ansichten müssen im selben Browserprofil unter demselben Ursprung laufen.
+
+Folien, Code-Datei/-Seite, ausgewählte Ansicht, Messergebnis, Flow-Auswahl und Schwarzbild werden über BroadcastChannel/localStorage synchronisiert. Die Hubble-UI-Instanzen sehen denselben Live-Verkehr; interne Hubble-Auswahl, Zoom und Filter werden von Hubble selbst verwaltet und sind **nicht** zwischen Fenstern gekoppelt. Für eine identische Flow-Auswahl auf beiden Displays die integrierte Ansicht **Flowdetails** verwenden.
+
+| Taste                           | Funktion                           |
+| ------------------------------- | ---------------------------------- |
+| ← / →, Bild↑ / Bild↓, Leertaste | Folien wechseln                    |
+| Pos1 / Ende                     | Erste / letzte Folie               |
+| ↑ / ↓                           | Sprechtextabschnitt wechseln       |
+| N                               | Notizen ein-/ausblenden            |
+| B                               | Zuschauerbild schwarz / fortsetzen |
+| F                               | Vollbild                           |
+| ?                               | Hilfe                              |
+
+## Praxis: Code → Ausführung → Nachweis
+
+- **A · Beobachten:** `server.py` lesen, Client ausführen, Request-ID in Antwort und Backend-Log finden, Hubble-Flow zuordnen.
+- **B · Verteilen:** fünf HTTP-Anfragen über eine Verbindung mit zehn neu aufgebauten Verbindungen vergleichen. Backend-Namen sind gemessen; es gibt keine festgelegte Verteilungsfolge.
+- **C · Netzwerkregel:** offene Policy → B erfolgreich → `role: trusted` ergänzen → B Timeout / Hubble `POLICY_DENIED` → A erfolgreich → offene Policy → B wieder erfolgreich.
+- **D · Kernelzustand:** echte Pod-/Service-Adressen, Endpoint-Identitäten, BPF-LB-Map und BPF-Policy-Maps vergleichen.
+
+**Code groß** zeigt den Quelltext für das Publikum vergrößert. Die Dateiansicht ist paginiert; Zeilennummern beziehen sich auf die vollständige Datei. **Code + Ergebnis**, **Originalausgabe**, **Hubble UI**, **Flowdetails** und **Backend-Logs** stellen unterschiedliche Nachweise dar. Die Messungsauswahl erlaubt den Vergleich vorheriger Befehle innerhalb der Sitzung. Vollständige Protokolle liegen lokal unter `lab/evidence/` (Git-ignoriert).
+
+Der separate animierte XDP-Versuch wurde entfernt. XDP wird fachlich erklärt; die ausführbare Filterdemonstration verwendet Cilium-Policy im TC-Datenpfad.
+
+## Gestaltung und Originalgrafiken
+
+Die Cilium-Hero-/Use-Case-Komponenten wurden anhand ihrer Originalquellen übertragen. Die technischen Folien verwenden Cloudflare Docs' originale OKLCH-Farben, Typografie, Codeflächen und Komponentenmaße, vergrößert für die Projektion. Originalgrafiken von Cilium ersetzen die nachgezeichneten Illustrationen. Herkunft, Lizenzen und Anpassungen stehen in [public/vendor/ATTRIBUTION.md](public/vendor/ATTRIBUTION.md); der konkrete Abgleich in [docs/DESIGN-ANALYSE.md](docs/DESIGN-ANALYSE.md).
+
+## Prüfungen und Abgabe
 
 ```sh
 npm test
 npm run build
-npm run preview
+# Bei laufendem Labor und laufender Brücke:
+npm run lab:verify
 ```
 
-Der Build liegt in `dist/` und kann bei einem statischen Webhost bereitgestellt werden. Relative Assetpfade unterstützen auch Unterverzeichnisse. Es ist kein Hostingdienst vorkonfiguriert.
+Der Live-Test prüft Ausgangszustand, Request-ID-Korrelation, Keep-alive, neue Verbindungen, Policy-Drop, erlaubte Kontrolle, BPF-Maps und Wiederherstellung. Er setzt abschließend die offene Policy. Die Pipeline führt die lokalen Tests und den Build aus; ein Docker-Labor ist nicht Teil des GitHub-CI-Jobs.
 
-## Auf dem MacBook präsentieren
-
-1. In macOS unter **Systemeinstellungen → Displays** den zweiten Bildschirm als **erweiterten Bildschirm** einstellen.
-2. **Präsentieren** anklicken. Das Zuschauerfenster auf den zweiten Bildschirm ziehen und dort mit **F** Vollbild aktivieren.
-3. Auf dem MacBook bleiben Foliensteuerung, Timer, Sprechtext und der Titel der nächsten Folie sichtbar.
-4. In einer Videokonferenz **nur das Zuschauerfenster oder den zweiten Bildschirm** teilen. Das Bildschirmteilen selbst übernimmt die Konferenz-App.
-
-Falls Popups blockiert werden, in der **Hilfe** die Zuschaueransicht als Tab öffnen. Direkte Einstiege: `?view=presenter` und `?view=audience`.
-
-Beide Fenster müssen dieselbe URL-Basis und dasselbe Browserprofil verwenden. `BroadcastChannel` synchronisiert Folien, Antworten, Simulationszustand und Schwarzbild. `localStorage` dient als Fallback und stellt die letzte Folie wieder her. Eine Verbindung zu fremden Geräten ist nicht vorgesehen. Bei mehreren Referentenfenstern übernimmt das zuletzt bediente Fenster die Steuerung, damit inaktive Tabs die Zuschaueransicht nicht zurücksetzen. Für den Vortrag wird eine Referentenansicht empfohlen.
-
-## Sprechtext ohne Scrollen
-
-- Der Sprechtext hat einen festen Platz im Fenster und ist standardmäßig **22 CSS-Pixel** groß.
-- **A− / A+** ändern die Größe zwischen 18 und 30 Pixeln.
-- Die verfügbare Breite und Höhe werden gemessen. Längere Texte erscheinen in **Abschnitten**, die jeweils vollständig in den sichtbaren Bereich passen. Es gibt keine Scrollleiste im Sprechtext.
-- Mit **↑ / ↓** oder den Pfeilen unter dem Text zwischen Abschnitten wechseln. Beim Folienwechsel beginnt der Sprechtext wieder beim ersten Abschnitt.
-- Über das **Stiftsymbol** lässt sich der Text in einem separaten Dialog bearbeiten. Änderungen bleiben lokal im Browser und werden nicht an Zuschauer übertragen.
-- Auf schmalen Geräten stehen Folie und Sprechtext übereinander, jeweils in festen Bereichen.
-
-| Taste                    | Funktion                                    |
-| ------------------------ | ------------------------------------------- |
-| → / Leertaste / PageDown | Nächste Folie                               |
-| ← / PageUp               | Vorherige Folie                             |
-| ↑ / ↓                    | Sprechtextabschnitt zurück / weiter         |
-| Home / End               | Erste / letzte Folie                        |
-| N                        | Sprechtext ein-/ausblenden                  |
-| B                        | Zuschauerbild schwarz schalten / fortsetzen |
-| F                        | Vollbild im aktuellen Fenster               |
-| ?                        | Hilfe                                       |
-
-Die Zuschaueransicht zeigt ausschließlich die Folie. Sie wird proportional in das Fenster eingepasst, ohne dass Inhalte umgebrochen oder abgeschnitten werden. Bei abweichendem Bildschirmformat bleiben schwarze Ränder.
-
-## Folieninhalte
-
-15 Folien behandeln Grundprinzip, Laden und Ausführen, Verifier/JIT, Maps, Hooks, konkrete Unternehmenseinsätze, Versuchsaufbau, vier Praxisphasen, Testmatrix, Wiederholungsfragen und Quellen.
-
-Die Texte erklären konkrete Abläufe und Beispiele. Folien und gesprochene Erläuterung sind getrennt. Über **Folien → Handout herunterladen** wird ein Markdown-Handout mit Folienpunkten, mitgelieferten Sprechtexten, drei Fragen mit Antworten und Quellen erzeugt. Lokale Sprechtextänderungen werden nicht in das Handout übernommen.
-
-## Geführte Experimente
-
-Die vier Praxisfolien enthalten unterschiedliche Experimente statt eines gemeinsamen Zählers. Über **Versuch auswählen** zwischen den Fällen wechseln. Jeder Fall beginnt mit einer Frage an die Zuschauer; über **A / B** kann eine Vorhersage festgehalten werden.
-
-- **Nächster Schritt / Zurück:** Paket oder Verbindung schrittweise durch den Ablauf verfolgen. Jeder Schritt zeigt eine Erklärung, den aktiven Pfad sowie die passenden Paket-, Regel- oder Ergebnisfelder.
-- **Wiedergabe:** Schritte im Abstand von 2,4 Sekunden abspielen; jederzeit pausierbar. Sie endet bei der Auswertung und startet keinen neuen Fall automatisch.
-- **Nächster Versuch:** Zum nächsten Vergleich wechseln. Die abgeschlossenen Policy-/XDP-Fälle werden bis zum Folienwechsel als Vergleich festgehalten.
-- **Zurücksetzen:** Aktuellen Fall wieder bei der Vorhersage beginnen. Beim Folienwechsel wird das Experiment neu initialisiert.
-
-| Praxisfolie    | Sichtbarer Vergleich                                                   | Lernziel                                                                                 |
-| -------------- | ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| Observability  | Service-Ziel → Backend-Zuordnung → HTTP-Antwort                        | Die Service-Adresse allein nennt den antwortenden Prozess nicht.                         |
-| Load Balancing | 5 Requests auf 1 Verbindung vs. 5 neue Verbindungen                    | Das Backend wird je neuer TCP-Verbindung gewählt. Keep-alive behält die Zuordnung.       |
-| Network Policy | Client B vorher, blockiert, Client A erlaubt, Client B wieder erlaubt  | Ein Policy-Drop erreicht den HTTP-Dienst nicht und produziert keinen HTTP-403-Status.    |
-| XDP            | 9090 ohne Filter, 9090 gesperrt, 8080 erlaubt, 9090 wieder freigegeben | Regel-Map und Paketkontext führen zu PASS/DROP. XDP_PASS belegt noch keine HTTP-Antwort. |
-
-Die Backend-Folge der fünf neuen Verbindungen ist ein festes Beispiel A/B/B/A/B. Sie garantiert keine Verteilungsquote eines realen Load-Balancers. Die Beispiele setzen inhaltlich voraus, dass ein gültiger TCP-Header bereits sicher gelesen werden kann; der Pseudocode ist kein vollständiger Parser.
-
-**Die Website führt kein eBPF aus und misst keinen echten Netzwerkverkehr.** Der k3d-/Cilium-/Hubble-Aufbau und der separate XDP-Versuch sind noch umzusetzen; die Planung steht in [docs/INHALTSPLAN.md](docs/INHALTSPLAN.md).
-
-## Dateien
-
-- `src/deck.ts`: Folientitel, Stichpunkte, Sprechtexte, Fragen und Primärquellen.
-- `src/App.tsx`: feste Folienansicht, Referentenansicht, Pagination und Synchronisierung.
-- `src/experiment-model.mjs`: deterministische Abläufe, Entscheidungen und Zustandsvalidierung.
-- `src/Experiments.tsx`: Zuschauerfragen, Paketpfade, Inspector und Wiedergabesteuerung.
-- `src/Illustrations.tsx`: eigene SVG-Schichtenillustration.
-- `src/theme.css`: aus der Referenzanalyse abgeleitete Typografie, Farben und Diagrammstile.
-- `src/styles.css`: Darstellung und festes 1600 × 900-Folienraster.
-- `docs/`: ursprüngliche Referatsvorgaben und Inhaltsplan.
-
-Die Gestaltung ist an Cilium und Cloudflare Docs angelehnt; die detaillierte [Referenzanalyse](docs/DESIGN-ANALYSE.md) dokumentiert die Beobachtungen und ihre Umsetzung. Schriftarten werden lokal gebündelt (Inter, JetBrains Mono), Icons stammen von Lucide. Zum Präsentieren ist nach dem lokalen Start keine Internetverbindung erforderlich; externe Quellenlinks benötigen Internetzugang.
-
-Die ursprünglichen Vorgaben nennen 25 Minuten; die erweiterte Planung sieht etwa 36 Minuten vor. Zeitrahmen und Verwendung einer Website anstelle von Folien sind entsprechend den Vorgaben mit der Lehrperson abzustimmen.
+15 Folien, Richtzeit insgesamt 23:30 einschließlich Diskussion. Unter **Folien → Handout herunterladen** entsteht ein Markdown-Handout mit Folienpunkten, Standardsprechtexten, drei Fragen/Antworten und Quellen. Individuell bearbeitete Notizen werden nicht exportiert. Die ursprünglichen Vorgaben und die frühere Planung bleiben unter `docs/` als Projektunterlagen erhalten.

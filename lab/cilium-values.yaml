@@ -1,0 +1,20 @@
+kubeProxyReplacement: true
+# Docker's nested network/cgroup namespaces: use TC service LB in pods.
+socketLB:
+  hostNamespaceOnly: true
+rollOutCiliumPods: true
+k8sServiceHost: k3d-ebpf-talk-server-0
+k8sServicePort: 6443
+ipam:
+  operator:
+    clusterPoolIPv4PodCIDRList: [10.42.0.0/16]
+operator:
+  replicas: 1
+envoy:
+  enabled: true
+hubble:
+  enabled: true
+  relay:
+    enabled: true
+  ui:
+    enabled: true

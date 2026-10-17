@@ -17,30 +17,21 @@ import {
   X,
 } from "lucide-react";
 import { slides, sources, questions } from "./deck";
-import {
-  initialExperiment,
-  readPresentation,
-  caseFor,
-  buildTrace,
-} from "./experiment-model.mjs";
-import {
-  ExperimentSlide,
-  ExperimentControls,
-  type ExperimentState,
-} from "./Experiments";
-import { KernelIllustration } from "./Illustrations";
+import { initialLab, readPresentation } from "./presentation-model.mjs";
+import { LabControls, type LabState } from "./Lab";
+import { SlideContent } from "./Slides";
 import "@fontsource-variable/inter";
 import "@fontsource-variable/jetbrains-mono";
 import "./styles.css";
-import "./theme.css";
+import "./reference-design.css";
 
 type Snapshot = {
   index: number;
   black: boolean;
-  experiment: ExperimentState;
+  lab: LabState;
   answers: number[];
 };
-const KEY = "ebpf-deck-v2";
+const KEY = "ebpf-deck-v3";
 const audience =
   new URLSearchParams(location.search).get("view") === "audience";
 function stored(): Snapshot {
@@ -52,7 +43,7 @@ function stored(): Snapshot {
       ) as Snapshot) || {
         index: 0,
         black: false,
-        experiment: initialExperiment(),
+        lab: initialLab() as LabState,
         answers: [],
       }
     );
@@ -60,7 +51,7 @@ function stored(): Snapshot {
     return {
       index: 0,
       black: false,
-      experiment: initialExperiment(),
+      lab: initialLab() as LabState,
       answers: [],
     };
   }
@@ -110,8 +101,6 @@ export default function App() {
   const origin = useRef(0);
   const elapsed = useRef(0);
   const slide = slides[state.index];
-  const [playing, setPlaying] = useState(false);
-  const trace = buildTrace(caseFor(state.index, state.experiment.caseIndex));
   const speak =
     typeof customNotes[state.index] === "string"
       ? customNotes[state.index]
@@ -204,12 +193,26 @@ export default function App() {
   const go = (target: number) => {
     if (audience) return;
     const index = Math.max(0, Math.min(slides.length - 1, target));
-    setPlaying(false);
     mutate((s) => ({
       ...s,
       index,
       black: false,
-      experiment: s.index !== index ? initialExperiment() : s.experiment,
+      lab:
+        s.index !== index
+          ? {
+              ...s.lab,
+              view: "split",
+              source:
+                index === 9
+                  ? "client"
+                  : index === 10
+                    ? "trusted"
+                    : index === 11
+                      ? "workloads"
+                      : "server",
+              page: index === 11 ? 3 : 1,
+            }
+          : s.lab,
     }));
   };
   const fullscreen = () => {
@@ -309,58 +312,6 @@ export default function App() {
     link.click();
     setTimeout(() => URL.revokeObjectURL(link.href), 1000);
   }
-  const chooseCase = (caseIndex: number) => {
-    setPlaying(false);
-    mutate((s) => ({
-      ...s,
-      experiment: { ...s.experiment, caseIndex, step: 0, prediction: null },
-    }));
-  };
-  const moveStep = (delta: number) =>
-    mutate((s) => {
-      const last =
-        buildTrace(caseFor(s.index, s.experiment.caseIndex)).length - 1;
-      const step = Math.max(0, Math.min(last, s.experiment.step + delta));
-      return {
-        ...s,
-        experiment: {
-          ...s.experiment,
-          step,
-          completed:
-            step === last
-              ? [
-                  ...new Set([
-                    ...s.experiment.completed,
-                    s.experiment.caseIndex,
-                  ]),
-                ]
-              : s.experiment.completed,
-        },
-      };
-    });
-  useEffect(() => {
-    if (!playing || audience || modal || state.black) return;
-    if (!ownsControl()) {
-      setPlaying(false);
-      return;
-    }
-    if (state.experiment.step >= trace.length - 1) {
-      setPlaying(false);
-      return;
-    }
-    const id = setTimeout(() => {
-      if (ownsControl()) moveStep(1);
-      else setPlaying(false);
-    }, 2400);
-    return () => clearTimeout(id);
-  }, [
-    playing,
-    state.experiment.step,
-    state.experiment.caseIndex,
-    state.index,
-    modal,
-    state.black,
-  ]);
   const toggleAnswer = (i: number) =>
     mutate((s) => ({
       ...s,
@@ -370,11 +321,7 @@ export default function App() {
     }));
   const time = `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
   const deck = (
-    <SlideContent
-      index={state.index}
-      experiment={state.experiment}
-      answers={state.answers}
-    />
+    <SlideContent index={state.index} lab={state.lab} answers={state.answers} />
   );
   if (audience)
     return (
@@ -438,22 +385,12 @@ export default function App() {
             </div>
           )}
           {slide.kind === "lab" && (
-            <ExperimentControls
+            <LabControls
               index={state.index}
-              state={state.experiment}
-              playing={playing}
-              choose={chooseCase}
-              move={moveStep}
-              predict={(prediction) =>
-                mutate((s) => ({
-                  ...s,
-                  experiment: { ...s.experiment, prediction },
-                }))
+              state={state.lab}
+              onChange={(patch) =>
+                mutate((s) => ({ ...s, lab: { ...s.lab, ...patch } }))
               }
-              togglePlay={() => {
-                claimControl();
-                setPlaying((v) => !v);
-              }}
             />
           )}
           {slide.kind === "questions" && (
@@ -516,7 +453,7 @@ export default function App() {
             <div className="speaker-timing">
               <div>
                 <span>Gesamtzeit</span>
-                <strong className={seconds >= 2160 ? "overtime" : ""}>
+                <strong className={seconds >= 1500 ? "overtime" : ""}>
                   {time}
                 </strong>
               </div>
@@ -617,7 +554,7 @@ export default function App() {
                       {String(i + 1).padStart(2, "0")} · {s.section}
                     </span>
                     <strong>{s.title}</strong>
-                    {s.kind === "lab" && <small>Simulation</small>}
+                    {s.kind === "lab" && <small>Linux-Labor</small>}
                   </button>
                 ))}
               </div>
@@ -708,7 +645,8 @@ export default function App() {
               </a>
               <p className="dialog-hint">
                 Beide Ansichten im gleichen Browserprofil und auf demselben
-                Ursprung öffnen. Die Demo führt keine eBPF-Programme aus.
+                Ursprung öffnen. Das Linux-Labor läuft separat in Docker; npm
+                run lab verbindet die Website damit.
               </p>
               <button className="handout-download" onClick={downloadHandout}>
                 <Download size={17} /> Handout herunterladen
@@ -940,443 +878,5 @@ function Dialog({
         {children}
       </div>
     </div>
-  );
-}
-
-function BulletList({ items }: { items: string[] }) {
-  return (
-    <ul className="slide-bullets">
-      {items.map((v) => (
-        <li key={v}>{v}</li>
-      ))}
-    </ul>
-  );
-}
-function FlowNode({
-  label,
-  detail,
-  accent = false,
-}: {
-  label: string;
-  detail?: string;
-  accent?: boolean;
-}) {
-  return (
-    <div className={`flow-node ${accent ? "accent" : ""}`}>
-      <strong>{label}</strong>
-      {detail && <span>{detail}</span>}
-    </div>
-  );
-}
-function Arrow() {
-  return (
-    <span className="diagram-arrow" aria-hidden="true">
-      →
-    </span>
-  );
-}
-function Topology() {
-  return (
-    <div className="topology">
-      <div className="node-stack">
-        <FlowNode label="Client A" detail="berechtigt" />
-        <FlowNode label="Client B" detail="weiterer Client" />
-      </div>
-      <Arrow />
-      <FlowNode label="web:8080" detail="Service-Adresse" accent />
-      <Arrow />
-      <div className="node-stack">
-        <FlowNode label="backend-a" detail="Python-Webserver" />
-        <FlowNode label="backend-b" detail="Python-Webserver" />
-      </div>
-    </div>
-  );
-}
-function SlideContent({
-  index,
-  experiment,
-  answers,
-}: {
-  index: number;
-  experiment: ExperimentState;
-  answers: number[];
-}) {
-  const s = slides[index];
-  return (
-    <article
-      className={`slide slide-${s.kind} chapter-${s.section.toLowerCase()}`}
-      aria-label={`Folie ${index + 1}: ${s.title}`}
-    >
-      {s.kind === "title" ? (
-        <>
-          <div className="title-subject">
-            <span className="chapter-mark" /> Linux-Netzwerke · eBPF
-          </div>
-          <KernelIllustration />
-          <h1>eBPF</h1>
-          <p className="title-subtitle">
-            Netzwerkverkehr beobachten,
-            <br />
-            verteilen und absichern
-          </p>
-          <ol className="agenda">
-            {s.bullets.map((v, i) => (
-              <li key={v}>
-                <span>{i + 1}</span>
-                {v}
-              </li>
-            ))}
-          </ol>
-        </>
-      ) : (
-        <>
-          <header className="slide-header">
-            <div className="slide-kicker">
-              <span className="chapter-mark" />
-              {s.section} <span>/ {String(index + 1).padStart(2, "0")}</span>
-            </div>
-            <h1>{s.title}</h1>
-          </header>
-          <div className="slide-body">
-            {s.kind === "definition" && (
-              <>
-                <p className="definition">
-                  Mit eBPF führt Linux geprüfte Programme aus,
-                  <br />
-                  sobald ein passendes Kernelereignis eintritt.
-                </p>
-                <div className="kernel-schema">
-                  <div className="user-layer">
-                    <strong>Userspace</strong>
-                    <span>Python-Anwendung · Konfiguration · Auswertung</span>
-                  </div>
-                  <div className="kernel-layer">
-                    <strong>Linux-Kernel</strong>
-                    <div>
-                      <FlowNode label="Ereignis" detail="z. B. Paketempfang" />
-                      <Arrow />
-                      <FlowNode
-                        label="Hook"
-                        detail="definierter Einsatzpunkt"
-                      />
-                      <Arrow />
-                      <FlowNode
-                        label="eBPF-Programm"
-                        detail="verarbeitet den Kontext"
-                        accent
-                      />
-                    </div>
-                  </div>
-                </div>
-                <BulletList items={s.bullets} />
-              </>
-            )}
-            {s.kind === "lifecycle" && (
-              <>
-                <div className="lifecycle">
-                  <div className="flow-caption">Einmal beim Einrichten</div>
-                  <div className="flow-row">
-                    <FlowNode label="Bytecode laden" />
-                    <Arrow />
-                    <FlowNode label="Verifier" detail="prüfen" />
-                    <Arrow />
-                    <FlowNode label="JIT" detail="falls unterstützt" />
-                    <Arrow />
-                    <FlowNode label="Hook anbinden" accent />
-                  </div>
-                  <div className="runtime-row">
-                    <span>Bei jedem passenden Ereignis</span>
-                    <FlowNode label="Paket kommt an" />
-                    <Arrow />
-                    <FlowNode label="Programm läuft" accent />
-                    <Arrow />
-                    <FlowNode label="PASS oder DROP" />
-                  </div>
-                </div>
-                <BulletList items={s.bullets} />
-              </>
-            )}
-            {s.kind === "verifier" && (
-              <>
-                <div className="verifier-example">
-                  <div className="example-label">
-                    Beispiel: TCP-Header aus einem Paket lesen
-                  </div>
-                  <div className="check-line">
-                    <span>1</span>
-                    <strong>
-                      Sind die benötigten Bytes im Paket vorhanden?
-                    </strong>
-                  </div>
-                  <div className="check-line">
-                    <span>2</span>
-                    <strong>Erst nach dieser Prüfung den Header lesen.</strong>
-                  </div>
-                  <p>
-                    Der Verifier muss die Zugriffsgrenzen nachvollziehen können.
-                  </p>
-                </div>
-                <BulletList items={s.bullets} />
-              </>
-            )}
-            {s.kind === "maps" && (
-              <>
-                <div className="maps-example">
-                  <div className="maps-roles">
-                    <FlowNode
-                      label="Python / Userspace"
-                      detail="Regel setzen · Zähler lesen"
-                    />
-                    <span className="diagram-arrow">↕</span>
-                  </div>
-                  <div className="map-tables">
-                    <div>
-                      <h2>Regel-Map</h2>
-                      <table>
-                        <thead>
-                          <tr>
-                            <th>TCP-Port</th>
-                            <th>gesperrt</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <tr>
-                            <td>9090</td>
-                            <td>ja</td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                    <div>
-                      <h2>Zähler-Map</h2>
-                      <table>
-                        <thead>
-                          <tr>
-                            <th>Aktion</th>
-                            <th>Anzahl</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <tr>
-                            <td>PASS</td>
-                            <td>3</td>
-                          </tr>
-                          <tr>
-                            <td>DROP</td>
-                            <td>2</td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                  <div className="maps-roles">
-                    <span className="diagram-arrow">↕</span>
-                    <FlowNode
-                      label="eBPF / Kernel"
-                      detail="Regel lesen · Zähler erhöhen"
-                      accent
-                    />
-                  </div>
-                </div>
-                <p className="example-note">
-                  Beispielwerte nach fünf TCP-Paketen, davon zwei an den
-                  gesperrten Port.
-                </p>
-                <BulletList items={s.bullets} />
-              </>
-            )}
-            {s.kind === "hooks" && (
-              <>
-                <table className="teaching-table">
-                  <thead>
-                    <tr>
-                      <th>Hook</th>
-                      <th>Kontext / Zeitpunkt</th>
-                      <th>Beispielaufgabe</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {[
-                      [
-                        "XDP",
-                        "Eingehendes Paket",
-                        "Früh PASS / DROP entscheiden",
-                      ],
-                      [
-                        "TC",
-                        "Paket am Netzwerkinterface",
-                        "Pakete filtern oder umleiten",
-                      ],
-                      [
-                        "Socket-Hooks",
-                        "z. B. neuer Verbindungsaufbau",
-                        "Service-Ziel auf Backend umsetzen",
-                      ],
-                      [
-                        "Tracepoints",
-                        "Definierte Kernelereignisse",
-                        "Verbindungen und Zustände beobachten",
-                      ],
-                    ].map((row) => (
-                      <tr key={row[0]}>
-                        {row.map((v, i) =>
-                          i === 0 ? <th key={i}>{v}</th> : <td key={i}>{v}</td>,
-                        )}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                <BulletList items={s.bullets} />
-              </>
-            )}
-            {s.kind === "companies" && (
-              <>
-                <table className="teaching-table company-table">
-                  <thead>
-                    <tr>
-                      <th>Unternehmen</th>
-                      <th>System</th>
-                      <th>Aufgabe</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {[
-                      [
-                        "Meta",
-                        "Katran",
-                        "Netzwerk-Lastverteilung mit eBPF/XDP",
-                        2,
-                      ],
-                      [
-                        "Netflix",
-                        "Flow Exporter",
-                        "TCP-Flows über eBPF-Tracepoints erfassen",
-                        3,
-                      ],
-                      [
-                        "Microsoft Azure",
-                        "Azure CNI mit Cilium",
-                        "eBPF-Datenpfad und Netzwerkrichtlinien",
-                        8,
-                      ],
-                      [
-                        "Cloudflare",
-                        "L4Drop",
-                        "Pakete zur DDoS-Abwehr verwerfen",
-                        7,
-                      ],
-                    ].map(([company, system, task, id]) => (
-                      <tr key={String(company)}>
-                        <th>{company}</th>
-                        <td>{system}</td>
-                        <td>
-                          {task}{" "}
-                          <a
-                            href={sources[Number(id)][1]}
-                            target="_blank"
-                            rel="noreferrer"
-                          >
-                            [{Number(id) + 1}]
-                          </a>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                <BulletList items={s.bullets} />
-              </>
-            )}
-            {s.kind === "topology" && (
-              <>
-                <Topology />
-                <BulletList items={s.bullets} />
-                <p className="scope-note">
-                  Aktueller Stand: Browser-Simulation. Der Linux-Laboraufbau ist
-                  noch umzusetzen.
-                </p>
-              </>
-            )}
-            {s.kind === "lab" && (
-              <ExperimentSlide index={index} state={experiment} />
-            )}
-            {s.kind === "results" && (
-              <>
-                <table className="teaching-table result-table">
-                  <thead>
-                    <tr>
-                      <th>Versuch</th>
-                      <th>Nachweis im Linux-Labor</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <th>Beobachten</th>
-                      <td>HTTP-Antwort + zugehöriges Flow-Ereignis</td>
-                    </tr>
-                    <tr>
-                      <th>Lastverteilung</th>
-                      <td>Neue TCP-Verbindungen → Antworten beider Backends</td>
-                    </tr>
-                    <tr>
-                      <th>Netzwerkregel</th>
-                      <td>Nur Client B blockiert + passender Policy-Drop</td>
-                    </tr>
-                    <tr>
-                      <th>XDP-Portfilter</th>
-                      <td>9090 blockiert, 8080 erreichbar + DROP-Differenz</td>
-                    </tr>
-                    <tr>
-                      <th>Wiederherstellung</th>
-                      <td>
-                        Nach Entfernen der Regel beide Zugriffe erfolgreich
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-                <BulletList items={s.bullets} />
-              </>
-            )}
-            {s.kind === "questions" && (
-              <ol className="question-list">
-                {questions.map(([q, a], i) => (
-                  <li key={q}>
-                    <div>
-                      <span>{i + 1}</span>
-                      <h2>{q}</h2>
-                    </div>
-                    {answers.includes(i) && <p>{a}</p>}
-                  </li>
-                ))}
-              </ol>
-            )}
-            {s.kind === "sources" && (
-              <ol className="source-list">
-                {sources.map(([title, url], i) => (
-                  <li key={url}>
-                    <span>[{i + 1}]</span>
-                    <a href={url} target="_blank" rel="noreferrer">
-                      {title}
-                    </a>
-                  </li>
-                ))}
-              </ol>
-            )}
-          </div>
-        </>
-      )}
-      <footer className="slide-footer">
-        <span>eBPF · Linux-Netzwerke</span>
-        <span>
-          {s.sourceIds.map((i) => (
-            <a key={i} href={sources[i][1]} target="_blank" rel="noreferrer">
-              [{i + 1}]
-            </a>
-          ))}
-        </span>
-        <span>
-          {index + 1} / {slides.length}
-        </span>
-      </footer>
-    </article>
   );
 }

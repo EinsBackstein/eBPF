@@ -1,44 +1,64 @@
-# Designanalyse: Cilium und Cloudflare Docs
+# Abgleich mit den Originalseiten
 
-Untersucht am 17.10.2026 im Browser, jeweils in einer Desktopansicht mit 1440 × 1000 Pixeln. Cilium wurde in dunkler und heller Darstellung betrachtet; Cloudflare Docs in heller Darstellung. Die Messungen stammen aus den berechneten CSS-Stilen der geöffneten Seiten.
+Stand: 17. Oktober 2026. Referenzen wurden im Browser visuell geprüft und die Originalquellen gelesen. Die vorherige freie Interpretation sowie die selbst gezeichnete Cilium-ähnliche Illustration wurden ersetzt.
 
-## Referenzen und Beobachtungen
+## Cilium
 
-### Cilium: Startseite und Service Map
+Referenzen: [Startseite](https://cilium.io/) und [Service Map](https://cilium.io/use-cases/service-map/). Maßgebliche Quellen im Repository [cilium/cilium.io](https://github.com/cilium/cilium.io): `tailwind.config.js`, `src/components/pages/home/hero/hero.jsx`, `src/components/pages/use-cases/hero/hero.jsx`.
 
-- [Cilium](https://cilium.io/): Zweispaltiger Einstieg mit Text links und einer technischen Schichtenillustration rechts. Die Illustration verbindet Anwendungen, eBPF und Kernel über räumlich versetzte Ebenen, dünne Verbindungen und sparsame Farbakzente. Blau markiert Netzwerktechnik, Gelb die eBPF-Ebene. Grün, Violett und Orange unterscheiden weitere Funktionen.
-- Die Startseite verwendet **Inter**. Gemessen am Haupttitel: 48 Pixel, Gewicht 700, Zeilenhöhe 60 Pixel. Der primäre Link nutzt `rgb(0, 115, 230)` und 4 Pixel Eckenradius. Der helle Seitenhintergrund ist kühl und leicht grau; die dunkle Variante ist dunkelblau.
-- [Service Map](https://cilium.io/use-cases/service-map/): Themenkennzeichnung oberhalb des Titels, Text und Illustration nebeneinander. Eine konkrete Diagnosefrage führt zur Erklärung. Der Zusammenhang zwischen Kommunikationsweg und Fehlersuche steht im Vordergrund.
-- [Cilium / Hubble](https://docs.cilium.io/en/stable/overview/intro/): Kommunikationsbeziehungen, konkrete Flowdetails und die Frage nach dem Grund einer fehlgeschlagenen Verbindung bilden die fachliche Grundlage der Observability-Demo.
+Übernommene Originalwerte:
 
-### Cloudflare Docs: Übersicht und CLI-Anleitung
+| Bestandteil      | Original                                                                      |
+| ---------------- | ----------------------------------------------------------------------------- |
+| Schrift          | Inter                                                                         |
+| Text             | `#141A1F`                                                                     |
+| Hero-Fläche      | `#F6F7F8`                                                                     |
+| Primärblau       | `#0073E6`                                                                     |
+| Rahmen           | `#E0E5EB`, `#D1D7E0`                                                          |
+| Hero-Überschrift | 48 px / 60 px, Gewicht 700                                                    |
+| Hero-Text        | 18 px, maximal 488 px breit                                                   |
+| Aufbau           | 12-Spalten-Grid; Text links, Originalillustration rechts                      |
+| CTAs             | 4 px Radius, Blau bzw. weiß mit Rahmen                                        |
+| Use-Case-Badge   | 14 px, 600, uppercase, 1.4 px Laufweite; Blau mit 10 % Hintergrund            |
+| Use-Case-Aufbau  | Badge, Überschrift, Tagline, feine Trennlinie, Frage + Erklärung; Bild rechts |
 
-- [Übersicht](https://developers.cloudflare.com/): Fast weiße Flächen, dunkle Inter-Typografie, feine graue Grenzen, orange aktive Register und zurückhaltend abgerundete Komponenten. Inhalte werden in überschaubare Themen und konkrete Beispiele aufgeteilt.
-- [Workers-CLI-Anleitung](https://developers.cloudflare.com/workers/get-started/guide/): Nummerierte Arbeitsschritte, Voraussetzungen, Codebeispiele mit Dateinamen, Register für Varianten und aufklappbare Erklärungen. Handlungen und ihre erwarteten Ergebnisse werden direkt miteinander verbunden.
-- Gemessen: Fließtext **Inter Variable, 16 Pixel, Zeilenhöhe 28 Pixel**. Haupttitel **35 Pixel / 43,75 Pixel, Gewicht 600**. Code verwendet **JetBrains Mono Variable, 14 Pixel / 22,75 Pixel**. Inline-Code besitzt einen sehr hellen Hintergrund, einen dünnen grauen Rahmen, 6 Pixel Eckenradius und orangefarbene Syntaxakzente.
-- Die Website-Navigation strukturiert Dokumentation. Für die Präsentation werden die inhaltliche Hierarchie und die Erklärungsmuster in ein festes 16:9-Format übertragen.
+Die beiden Cilium-Folien vergrößern diese Komponentenmaße um 1.25. Text und Navigationskontext sind auf das Referat angepasst. Die umgebende Website-Navigation, Konferenzankündigung und Produktwerbung werden nicht als Bedienelemente des Vortrags kopiert. Es handelt sich um eine Übertragung der Originalkomponenten auf ein festes 16:9-Format, nicht um eine Behauptung pixelidentischer vollständiger Webseiten.
 
-## Umsetzung in der Präsentation
+Originalgrafiken:
 
-| Beobachtetes Gestaltungsmittel     | Übertragung                                                                                 |
-| ---------------------------------- | ------------------------------------------------------------------------------------------- |
-| Cilium-Schichtenillustration       | Eigene SVG-Grafik zu Userspace, eBPF und Linux-Kernel auf der Titelfolie                    |
-| Funktionale Farbcodierung          | Blau für Verbindungen, Grün für Beobachtung/Antworten, Orange für Policy, Gelb für XDP/eBPF |
-| Inter + JetBrains Mono             | Lokal gebündelte Schriftarten, passend zu beiden Referenzen                                 |
-| Cloudflare-Codefelder und Register | Paket-/Verbindungsdaten, Regel und Ergebnis im synchronisierten Inspector                   |
-| Feine Grenzen und helle Flächen    | Leichte technische Diagramme und Tabellen mit klaren Abständen                              |
-| Nummerierte Anleitungen            | Fortschreitender Ablauf mit Vorhersage, Prüfung, Entscheidung und Auswertung                |
-| Konkrete Diagnosefragen            | Vier unterschiedliche Experimente mit sichtbaren Nachweisen statt austauschbarer Zähler     |
+- Hero-SVG direkt von cilium.io, ohne Nachzeichnung.
+- Kubernetes Bee direkt aus dem Service-Map-Seitenquellcode.
+- BPF-Map- und JIT-Abbildungen aus [BPF Architecture](https://docs.cilium.io/en/stable/reference-guides/bpf/architecture/).
 
-Die Folien behalten ihre feste Größe, die Referentenansicht ihre großen, abschnittsweise dargestellten Notizen. Die Darstellungen sind eigenständig; Markenlogos, Maskottchen, Screenshots und originale Illustrationsdateien der Referenzen werden nicht übernommen.
+## Cloudflare Docs
 
-## Didaktische Überarbeitung der Praxis
+Referenz: [Workers / Get started / CLI](https://developers.cloudflare.com/workers/get-started/guide/). Originalquellen: [globals.css](https://github.com/cloudflare/cloudflare-docs/blob/production/src/styles/globals.css), [prose.css](https://github.com/cloudflare/cloudflare-docs/blob/production/src/styles/prose.css).
 
-1. **Observability:** Eine konkrete Verbindung verfolgen. Service-Ziel, Backend-Zuordnung und HTTP-Antwort werden erst nacheinander sichtbar. Die Frage lautet, was die Service-Adresse allein verrät.
-2. **Load Balancing:** Fünf Requests mit Keep-alive und fünf Requests mit neuen TCP-Verbindungen vergleichen. Die Zuordnung von Request zu Verbindung und Backend bleibt im Bild nachvollziehbar. Die Beispielauswahl ist deterministisch, keine behauptete zufällige Messung.
-3. **Network Policy:** Client B vor der Regel, mit Regel, Client A als erlaubte Kontrolle und Client B nach Rücknahme. Bei DROP endet der Weg vor dem Dienst. Es entsteht keine erfundene HTTP-403-Antwort.
-4. **XDP:** Headerkontext ansehen, Regel-Map lesen, Port vergleichen, Entscheidung ausführen und auswerten. Ein DROP stoppt den gezeichneten Weg; PASS erlaubt weitere Verarbeitung und wird nicht mit einer erfolgreichen HTTP-Antwort gleichgesetzt.
+Übernommene Originalwerte:
 
-Jeder Fall hat eine Zuschauerfrage und eine optionale Vorhersage A/B. Die vortragende Person kann einzelne Schritte zeigen, zurückgehen, die Wiedergabe starten oder pausieren und verschiedene Fälle vergleichen. Abgeschlossene Policy-/XDP-Fälle bleiben innerhalb des Experiments als Vergleich sichtbar.
+| Bestandteil                    | Original                                                |
+| ------------------------------ | ------------------------------------------------------- |
+| Hintergrund                    | `oklch(0.99 0 0)`                                       |
+| Text                           | `oklch(0.21 0 0)`                                       |
+| Codekarte                      | `oklch(1 0 0)`                                          |
+| Code-Titel / abgesenkte Fläche | `oklch(0.975 0 0)`                                      |
+| Rahmen                         | `oklch(0.92 0 0)`                                       |
+| Sekundärtext                   | `oklch(0.556 0 0)`                                      |
+| Orange                         | `oklch(0.687 0.208 38.8)`                               |
+| Aktive neutrale Tabs           | `oklch(0.92 0 0)`, 6 px Radius                          |
+| h1                             | Inter Variable, 35 px / 43.75 px, 600, −0.025 em        |
+| h2                             | 20.8 px / 36.4 px, 600, −0.015 em                       |
+| Fließtext                      | 16 px / 28 px                                           |
+| Code                           | JetBrains Mono Variable, 14 px / 22.75 px, GitHub Light |
+| Code-Titelleiste               | 13 px / 20 px, 500, 8 px / 12 px Innenabstand           |
+| Codekarte                      | 8 px Radius, feiner Rahmen, Kopieraktion                |
 
-Alle IP-Adressen, Requests, Verbindungszuordnungen und Entscheidungen in diesen Experimenten sind Modelldaten. Ein echter Linux-Laboraufbau bleibt eine eigene Aufgabe; die technische Genauigkeit der dargestellten Zusammenhänge wird durch separate Modelltests geprüft.
+Die neutralen Tabs der aktuell ausgelieferten Referenz ersetzen die zuvor erfundene orange Unterstreichung. Die Originalfarben werden als OKLCH-Werte im CSS verwendet. Die technischen Folien übernehmen Breadcrumb, Seitentitel, Metazeile, Inhaltsrhythmus, Tabellen und Codekarten. Typografie ist für die Projektion vergrößert. Ein Bildschirm voller Produktnavigation wurde zugunsten der bereits geforderten Präsentationsbedienung nicht wieder eingeführt.
+
+Der Code wird mit Shiki im selben GitHub-Light-Thema aus den tatsächlich ausgeführten Dateien generiert. Die Pagination hält Quellzeilennummern bei und ermöglicht eine vergrößerte Codeansicht.
+
+## Tatsächliche Daten statt Grafikmodell
+
+Hubble wird nicht nachgebaut. Die Folie bettet die echte, lokal portweitergeleitete Hubble UI ein. Die integrierten Ansichten zeigen stdout, Backend-Logs und Original-Flow-JSON aus demselben Linux-Labor. Zeitstempel, Request-IDs, Verdict und Drop-Grund ermöglichen die Erklärung der Ursache. Der frühere Paketpfad mit animierten Punkten und die Vorhersagequizze des Praxisteils sind entfernt.
+
+Lizenztexte, Asset-URLs und Modifikationen: [ATTRIBUTION.md](../public/vendor/ATTRIBUTION.md).

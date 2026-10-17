@@ -1,0 +1,82 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ebpf-talk
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: ebpf-talk
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: web }
+  template:
+    metadata:
+      labels: { app: web }
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: web
+          image: python:3.13.7-alpine
+          command: [python, -u, /app/server.py]
+          ports: [{ containerPort: 8080 }]
+          readinessProbe:
+            httpGet: { path: /, port: 8080 }
+          resources:
+            requests: { cpu: 20m, memory: 24Mi }
+            limits: { memory: 96Mi }
+          volumeMounts: [{ name: app, mountPath: /app, readOnly: true }]
+      volumes:
+        - name: app
+          configMap: { name: python-app }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+  namespace: ebpf-talk
+spec:
+  selector: { app: web }
+  ports: [{ port: 8080, targetPort: 8080 }]
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: client-a
+  namespace: ebpf-talk
+  labels: { app: client-a, component: client, role: trusted }
+spec:
+  automountServiceAccountToken: false
+  containers:
+    - name: client
+      image: python:3.13.7-alpine
+      command: [python, -c, "import time; time.sleep(2147483647)"]
+      resources:
+        requests: { cpu: 10m, memory: 16Mi }
+        limits: { memory: 64Mi }
+      volumeMounts: [{ name: app, mountPath: /app, readOnly: true }]
+  volumes:
+    - name: app
+      configMap: { name: python-app }
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: client-b
+  namespace: ebpf-talk
+  labels: { app: client-b, component: client, role: guest }
+spec:
+  automountServiceAccountToken: false
+  containers:
+    - name: client
+      image: python:3.13.7-alpine
+      command: [python, -c, "import time; time.sleep(2147483647)"]
+      resources:
+        requests: { cpu: 10m, memory: 16Mi }
+        limits: { memory: 64Mi }
+      volumeMounts: [{ name: app, mountPath: /app, readOnly: true }]
+  volumes:
+    - name: app
+      configMap: { name: python-app }

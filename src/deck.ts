@@ -51,13 +51,13 @@ export const slides: Slide[] = [
       "Wie lassen sich Verbindungen verteilen und Pakete filtern?",
     ],
     notes:
-      "Bei einem Webdienst können drei unterschiedliche Probleme auftreten: Wir wissen nicht, wer zugreift, ein Backend bekommt zu viel Last oder unerwünschter Verkehr erreicht den Dienst.\n\nWir klären zuerst, wie eBPF im Kernel arbeitet. Danach sehen wir konkrete Einsätze bei Unternehmen. Im Praxisteil untersuchen wir Verbindungen, Lastverteilung und einen Portfilter. Die interaktive Demo dieser Website ist zunächst eine Simulation.",
+      "Wir untersuchen drei konkrete Fragen: Welcher Pod antwortet? Wann wechselt das Backend? Und warum erreicht ein Client den Dienst nicht?\n\nNach den Grundlagen führen wir echte Python-Anfragen in einem separaten Linux-Labor aus. Die Website zeigt den ausgeführten Code, die tatsächliche Ausgabe und Hubble. Auf dem zweiten Bildschirm bleiben nur die Folien sichtbar.",
   },
   {
     title: "Was ist eBPF?",
     short: "Grundprinzip",
     section: "Grundlagen",
-    time: "02:00",
+    time: "01:30",
     kind: "definition",
     sourceIds: [0],
     bullets: [
@@ -66,13 +66,13 @@ export const slides: Slide[] = [
       "Maps speichern Regeln, Zustand und Messwerte.",
     ],
     notes:
-      "eBPF stammt vom Berkeley Packet Filter ab. Ursprünglich ging es um Paketfilterung; heute werden auch andere Kernelereignisse unterstützt.\n\nEin eBPF-Programm wird als Bytecode geladen und vor der Ausführung geprüft. Es läuft an einem festgelegten Hook, etwa bei einem Netzwerkereignis. Dafür bauen wir den Kernel nicht neu. Python übernimmt in unserem Aufbau Anwendung und Steuerung; es läuft nicht als Python-Code im Kernel.",
+      "eBPF stammt vom Berkeley Packet Filter ab. Heute unterstützt Linux zahlreiche Ereignisse und Programmtypen. Ein Programm wird als Bytecode geladen und vor der Ausführung geprüft.\n\nEin Hook bestimmt Ereignis und Kontext. Maps halten Regeln, Zustand oder Messwerte. In unserem Labor läuft Python im Userspace. Cilium verwaltet die BPF-Programme im Linux-Kernel der Docker-VM.",
   },
   {
     title: "Laden und Ausführen eines eBPF-Programms",
     short: "Programmablauf",
     section: "Grundlagen",
-    time: "02:00",
+    time: "01:00",
     kind: "lifecycle",
     sourceIds: [0, 1],
     bullets: [
@@ -81,13 +81,13 @@ export const slides: Slide[] = [
       "Zur Laufzeit: Ein passendes Ereignis löst die Ausführung aus.",
     ],
     notes:
-      "Wir trennen das Laden vom späteren Ausführen. Beim Laden prüft der Verifier den Bytecode. Auf unterstützten Systemen übersetzt der JIT ihn in Maschinencode. Danach wird das Programm an einen Hook gebunden.\n\nBeispiel: Ein Programm hängt am XDP-Hook eines Interfaces. Sobald dort ein Paket ankommt, bekommt es dessen Kontext und liefert eine Entscheidung. Das Programm wird nicht für jedes Paket neu geladen.",
+      "Beim Laden prüft der Verifier den Bytecode. Auf unterstützten Systemen übersetzt der JIT ihn in Maschinencode. Anschließend wird das Programm an einen passenden Hook gebunden.\n\nDas Paket löst die spätere Ausführung aus; es lädt das Programm nicht neu. In der Praxis übernimmt Cilium das Einrichten und Aktualisieren dieses Datenpfads.",
   },
   {
     title: "Verifier und JIT haben unterschiedliche Aufgaben",
     short: "Verifier und JIT",
     section: "Grundlagen",
-    time: "02:00",
+    time: "01:00",
     kind: "verifier",
     sourceIds: [0, 1],
     bullets: [
@@ -96,28 +96,27 @@ export const slides: Slide[] = [
       "Die fachliche Regel prüft keiner von beiden: Ein falscher Port bleibt ein falscher Port.",
     ],
     notes:
-      "Ein Paket kann kürzer sein als erwartet. Bevor ein Programm einen Header liest, muss es nachweisen, dass die benötigten Bytes vorhanden sind. Solche Bedingungen verfolgt der Verifier.\n\nDer JIT hat eine andere Aufgabe: Er übersetzt Bytecode in Maschinencode. Beide entscheiden nicht, ob unsere Filterregel fachlich richtig ist. Sperren wir versehentlich Port 8080 statt 9090, kann das Programm trotzdem zulässig sein.",
+      "Die Originalgrafik aus der Cilium-Dokumentation zeigt den Übersetzungsschritt. Der Verifier prüft vorher unter anderem Speicherzugriffe und den Programmablauf. Der JIT übersetzt zulässigen Bytecode für die CPU.\n\nOb unsere Regel fachlich richtig ist, wissen beide nicht. Deshalb testen wir später gesperrten Client, erlaubte Kontrolle und Wiederherstellung getrennt.",
   },
   {
-    title: "Maps: Regeln setzen und Zähler auslesen",
+    title: "Maps: gemeinsamer Zustand im Datenpfad",
     short: "eBPF-Maps",
     section: "Grundlagen",
-    time: "02:00",
+    time: "01:00",
     kind: "maps",
     sourceIds: [0],
     bullets: [
-      "Userspace schreibt die Regel: TCP-Zielport 9090 sperren.",
-      "Das eBPF-Programm liest die Regel und aktualisiert Aktionszähler.",
-      "Userspace liest PASS und DROP aus, ohne das Programm neu zu laden.",
+      "Cilium verwaltet Service- und Policy-Einträge in BPF-Maps.",
+      "cilium-dbg liest die tatsächlichen Inhalte aus.",
     ],
     notes:
-      "Maps sind Datenstrukturen, auf die eBPF-Programme und Anwendungen im Userspace zugreifen können. In unserem Beispiel enthalten sie einen gesperrten Port und zwei Zähler.\n\nPython schreibt die Portregel über ein Werkzeug oder eine API. Das Kernelprogramm liest die Regel bei der Paketverarbeitung und erhöht den passenden Zähler. Python liest die Werte wieder aus. Die angezeigten Zahlen sind ein Beispiel mit fünf Paketen, keine Messung am MacBook.",
+      "Die Originalgrafik zeigt eine Map, auf die mehrere Userspace-Prozesse und BPF-Programme zugreifen. Maps sind typisierte Datenstrukturen; nicht jeder Map-Typ erlaubt dieselben Operationen.\n\nIm Labor schreibt Cilium unter anderem Service-Zuordnungen und Policy-Einträge in Maps. Wir lesen mit cilium-dbg den tatsächlichen Inhalt aus und gleichen ihn mit Pod-Adressen und Identitäten ab.",
   },
   {
     title: "Wichtige Hooks für Netzwerkaufgaben",
     short: "Hooks im Vergleich",
     section: "Grundlagen",
-    time: "02:00",
+    time: "01:00",
     kind: "hooks",
     sourceIds: [0, 5, 6],
     bullets: [
@@ -125,20 +124,20 @@ export const slides: Slide[] = [
       "Cilium nutzt mehrere Hooks. Eine Cilium-Netzwerkregel ist nicht automatisch ein XDP-Filter.",
     ],
     notes:
-      "Ein Hook ist der Einsatzpunkt eines Programms. XDP verarbeitet eingehende Pakete. Socket-Hooks können bei einem Verbindungsaufbau ein Service-Ziel auf ein Backend umsetzen. TC arbeitet an der Paketverarbeitung eines Interfaces. Tracepoints liefern Ereignisse zum Beobachten.\n\nDiese Tabelle ist kein Paketablauf von oben nach unten. Es sind unterschiedliche Einsatzpunkte. Native XDP läuft im Treiberpfad; unser geplanter separater Linux-Versuch verwendet Generic XDP.",
+      "Der Hook legt fest, welche Daten ein Programm sieht und welche Aktionen möglich sind. Diese Tabelle ist kein Paketablauf von oben nach unten.\n\nUnser Labor verwendet Cilium mit kube-proxy replacement. In der verschachtelten Docker-Umgebung ist Socket-LB auf den Host-Namespace begrenzt; Pod-Serviceverkehr wird im TC-Datenpfad umgesetzt. Die Netzwerkregel ist kein eigener XDP-Filter.",
   },
   {
     title: "Dokumentierte eBPF-Einsätze bei Unternehmen",
     short: "Produktionseinsätze",
     section: "Anwendungen",
-    time: "03:00",
+    time: "02:00",
     kind: "companies",
     sourceIds: [2, 3, 8, 7],
     bullets: [
       "Die Beispiele bezeichnen konkrete Systeme und dokumentierte Einsätze.",
     ],
     notes:
-      "Meta hat Katran als Netzwerk-Load-Balancer mit eBPF und XDP veröffentlicht. Netflix beschreibt einen Flow Exporter, der TCP-Flows über eBPF-Tracepoints erfasst.\n\nMicrosoft bietet Azure CNI powered by Cilium für AKS an. Cloudflare dokumentiert L4Drop für die DDoS-Abwehr. Wir betrachten also Lastverteilung, Beobachtung und Zugriffskontrolle. Daraus folgt nicht, dass die gesamte Infrastruktur dieser Unternehmen denselben Mechanismus verwendet.",
+      "Meta dokumentiert Katran für Netzwerk-Lastverteilung mit eBPF und XDP. Netflix beschreibt seinen Flow Exporter für TCP-Flows. Microsoft bietet Azure CNI powered by Cilium an, Cloudflare dokumentiert L4Drop.\n\nDiese Quellen belegen konkrete Systeme und Aufgaben. Sie bedeuten nicht, dass die gesamte Infrastruktur dieser Unternehmen denselben Mechanismus verwendet.",
   },
   {
     title: "Versuchsaufbau: ein Service, zwei Backends",
@@ -150,16 +149,16 @@ export const slides: Slide[] = [
     bullets: [
       "Client A und Client B greifen auf dieselbe Service-Adresse zu.",
       "Jedes Python-Backend antwortet mit seinem eigenen Namen.",
-      "Geplant für Linux: k3d + Cilium + Hubble; XDP in einem separaten Testnetz.",
+      "Linux-Labor: k3d + Cilium + Hubble mit echten Python-Backends.",
     ],
     notes:
-      "Die beiden Clients sprechen dieselbe Service-Adresse an. Hinter ihr stehen zwei Python-Webserver. Die Antwort enthält den Backend-Namen, damit wir erkennen, welcher Server eine Anfrage bedient hat.\n\nIm geplanten Linux-Labor übernimmt Cilium den Datenpfad und Hubble zeigt die Flows. Die Website bildet diese Effekte bisher im Browser nach. Der eigene XDP-Portfilter gehört in ein separates Testnetz und wird nicht in den Cilium-Datenpfad eingebaut.",
+      "Im Namespace ebpf-talk stehen zwei Python-Webserver hinter dem Service web auf Port 8080. Client A trägt role=trusted, Client B role=guest. Beide verwenden dieselbe Service-Adresse.\n\nHubble erzeugt die Service Map aus beobachtetem Verkehr. Die HTTP-Regeln in unserer Policy aktivieren zusätzlich L7-Sichtbarkeit über Envoy. Die Grafik auf dieser Folie ist ein originales Cilium-Asset; die nächste Hubble-Ansicht ist das laufende Labor.",
   },
   {
     title: "Welche Instanz beantwortet diese Anfrage?",
     short: "A · Beobachten",
     section: "Praxis",
-    time: "03:00",
+    time: "02:00",
     kind: "lab",
     sourceIds: [4],
     bullets: [
@@ -167,13 +166,13 @@ export const slides: Slide[] = [
       "Im Linux-Labor: Backend-Antwort und passenden Hubble-Flow vergleichen.",
     ],
     notes:
-      "Zuerst fragen wir, ob die Service-Adresse das antwortende Backend verrät. Wir halten die Vorhersage fest und gehen dann Schritt für Schritt vor: Verbindungsaufbau, Backend-Zuordnung, Antwort und Auswertung.\n\nDie Antwort backend-a wird mit Quelle und Route korreliert. Anschließend verfolgen wir Client B. Die Adressen und Ereignisse sind Modelldaten. Im Linux-Labor würden wir genau diese Verbindung mit Hubble und der echten HTTP-Antwort abgleichen.",
+      "Zeige zuerst server.py: Das Backend liefert seinen Podnamen, die Request-ID und die Gegenstelle der Serververbindung. Starte dann eine Anfrage von Client A. Die Ausgabe stammt aus kubectl exec im Labor.\n\nWechsle zu Backend-Logs und suche dieselbe Request-ID. Öffne anschließend Hubble UI oder die erfassten Flowdetails. Dort ordnen wir Client, Ziel-Endpoint und Verdict zu. Zeitstempel und Identitäten helfen bei der Zuordnung; ein beliebiger älterer Flow ist kein Beleg für diese Anfrage.",
   },
   {
-    title: "Fünf HTTP-Anfragen: eine oder fünf Verbindungen?",
+    title: "Keep-alive und neue TCP-Verbindungen",
     short: "B · Lastverteilung",
     section: "Praxis",
-    time: "04:00",
+    time: "02:00",
     kind: "lab",
     sourceIds: [5],
     bullets: [
@@ -181,13 +180,13 @@ export const slides: Slide[] = [
       "Mehrere HTTP-Anfragen auf derselben TCP-Verbindung bedeuten keine neue Backend-Auswahl.",
     ],
     notes:
-      "Wir vergleichen zwei Fälle mit jeweils fünf HTTP-Anfragen. Zuerst verwenden alle dieselbe TCP-Verbindung: conn-01 bleibt Backend A zugeordnet. Danach öffnen wir für jede Anfrage eine neue Verbindung.\n\nJetzt erscheinen fünf conn-IDs und im Beispiel beide Backends. Die fest gewählte Beispielverteilung ist keine versprochene Quote. Das Lernziel ist der Unterschied zwischen HTTP-Anfrage und TCP-Verbindung. Die Wiedergabe lässt sich jederzeit pausieren oder einzeln weiterschalten.",
+      "Zeige in client.py die Erzeugung von HTTPConnection und das Schließen im Modus new. Führe zuerst fünf Keep-alive-Anfragen aus, danach zehn neue Verbindungen. Vergleiche die tatsächlichen Backend-Namen.\n\nEine neue Verbindung ermöglicht eine neue Backend-Auswahl, garantiert aber keine andere Auswahl und keine 50:50-Verteilung. Wegen des aktiven L7-Proxys ist die serverseitige Gegenstelle kein direkter Beleg für die ursprüngliche Client-Verbindung. Dafür betrachten wir Clientcode und Hubble-Flows gemeinsam.",
   },
   {
     title: "Was sieht ein blockierter Client?",
     short: "C · Netzwerkregel",
     section: "Praxis",
-    time: "05:00",
+    time: "04:00",
     kind: "lab",
     sourceIds: [4, 5],
     bullets: [
@@ -195,21 +194,21 @@ export const slides: Slide[] = [
       "Client B testen → Regel entfernen → Zugriff erneut testen.",
     ],
     notes:
-      "Wir führen vier Versuche aus: Client B ohne Regel, Client B mit Regel, Client A als erlaubte Kontrolle und Client B nach Rücknahme. Vor jeder Ausführung fragen wir nach der erwarteten Entscheidung.\n\nIm Inspector sehen wir Quelle und aktive Regel. Bei einem Drop endet der Pfad vor dem Dienst. Der Client erhält keinen HTTP-403-Status, weil der Webserver den Request nicht verarbeitet. Die abgeschlossenen Fälle werden unten als Vergleich festgehalten.",
+      "Die offene Policy erlaubt beide Clients und erzeugt HTTP-Sichtbarkeit. Teste Client B als Ausgangspunkt. Zeige dann policy-trusted.yaml: Die zusätzliche Bedingung role=trusted schließt B aus.\n\nWende diese Policy an und teste B erneut. Vergleiche den Timeout mit einem aktuellen Hubble-Ereignis DROPPED / POLICY_DENIED. Prüfe Client A als erlaubte Kontrolle. Setze die offene Policy zurück und teste B nochmals. Erst diese Kombination zeigt Ursache, Kontrollfall und Wiederherstellung.",
   },
   {
-    title: "Wo endet ein verworfenes Paket?",
-    short: "D · XDP-Portfilter",
+    title: "Was steht tatsächlich in den BPF-Maps?",
+    short: "D · Kernelzustand",
     section: "Praxis",
-    time: "03:00",
+    time: "02:00",
     kind: "lab",
     sourceIds: [6],
     bullets: [
-      "Filter aktiv: TCP/9090 → DROP; TCP/8080 → PASS.",
-      "Filter deaktivieren und die Erreichbarkeit erneut prüfen.",
+      "Service-IP und Backend-Adressen in der BPF-LB-Map zuordnen.",
+      "Endpoint-Identitäten mit Policy-Einträgen vergleichen.",
     ],
     notes:
-      "Wir lesen zuerst den Zielport des modellierten Pakets, schlagen die Regel-Map nach und vergleichen den Wert. Erst danach erscheint PASS oder DROP. Wir vergleichen 9090 ohne Filter, 9090 gesperrt, 8080 als Kontrolle und 9090 nach Rücknahme.\n\nBei DROP endet der Pfad am XDP-Hook und der DROP-Zähler wird erhöht. PASS erlaubt nur die weitere Verarbeitung; es belegt noch keine HTTP-Antwort. Alle Schritte sind simuliert, keine Ausführung im Linux-Kernel.",
+      "Jetzt lesen wir den realen Kernelzustand. Pods und Service liefern die IP-Adressen; endpoint list liefert die zugehörigen Sicherheitsidentitäten. bpf lb list zeigt Service-Frontend und Backends.\n\nIn den Policy-Maps suchen wir die freigegebene Identität und den Port. Vergleiche die Map vor und nach der Label-Regel. Die Ausgabe ist umfangreich; wir lesen gezielt die relevanten Einträge. Cilium verwaltet diese Maps, Python schreibt sie in diesem Labor nicht selbst.",
   },
   {
     title: "Welche Ergebnisse müssen wir nachweisen?",
@@ -219,33 +218,33 @@ export const slides: Slide[] = [
     kind: "results",
     sourceIds: [4, 5, 6],
     bullets: [
-      "Eine Browser-Simulation ersetzt keinen Test des Linux-Datenpfads.",
+      "Jeder Laborbefehl liefert echte Ausgaben und erfasste Hubble-Ereignisse.",
       "HTTP-Anfragen, TCP-Verbindungen und Pakete sind unterschiedliche Messgrößen.",
     ],
     notes:
-      "Die Versuche brauchen jeweils einen passenden Nachweis. Für Lastverteilung vergleichen wir Antworten auf neue Verbindungen. Für Filterung brauchen wir einen vorher erfolgreichen Zugriff, einen passenden Drop und einen weiterhin erlaubten Kontrollzugriff.\n\nNach dem Entfernen der Regel prüfen wir die Wiederherstellung. Ein fehlgeschlagener Verbindungsversuch kann mehrere verworfene Pakete erzeugen, etwa durch Wiederholungen. Deshalb setzen wir Requests, Verbindungen und Paketzähler nicht gleich.",
+      "Für jede Aussage brauchen wir den passenden Nachweis. Eine Antwort belegt den verarbeitenden Backend-Pod. Ein Timeout allein beweist noch keine Policy-Sperre: Dafür benötigen wir den passenden Drop sowie den weiterhin erfolgreichen Kontrollzugriff.\n\nNach der Rücknahme muss Client B wieder antworten. HTTP-Anfragen, TCP-Verbindungen und einzelne Pakete dürfen dabei nicht gleichgesetzt werden.",
   },
   {
     title: "Fragen zur Wiederholung",
     short: "Fragen und Diskussion",
     section: "Abschluss",
-    time: "05:00",
+    time: "03:00",
     kind: "questions",
     sourceIds: [0, 1, 2, 3],
     bullets: [],
     notes:
-      "Diese drei Fragen fassen die Lernziele zusammen. Bei der ersten geht es um die Bausteine der Technologie. Bei der zweiten müssen Unternehmen, System und Aufgabe zusammenpassen.\n\nBei der dritten ist der Unterschied zwischen einer HTTP-Anfrage und einer TCP-Verbindung entscheidend. Die Antworten lassen sich einzeln einblenden. Für die Filterung gehören Kontrollzugriff und Wiederherstellung zum Nachweis dazu.",
+      "Diese drei Fragen fassen die Lernziele zusammen. Bei der ersten geht es um die Bausteine von eBPF. Bei der zweiten müssen Unternehmen, System und Aufgabe zusammenpassen.\n\nBei der dritten ist der Unterschied zwischen einer HTTP-Anfrage und einer TCP-Verbindung entscheidend. Die Antworten lassen sich einzeln einblenden. Danach bleibt Zeit für Fragen zum beobachteten Labor.",
   },
   {
     title: "Quellen",
     short: "Quellen",
     section: "Anhang",
-    time: "—",
+    time: "\u2014",
     kind: "sources",
     sourceIds: [],
     bullets: [],
     notes:
-      "Die Quellen sind direkt verlinkt und stehen zusätzlich im herunterladbaren Handout. Die Unternehmensbeispiele beziehen sich auf die genannten Veröffentlichungen beziehungsweise die verlinkte Produktdokumentation.\n\nFür den noch ausstehenden Linux-Aufbau müssen wir eine funktionierende Versionskombination und die ausgeführten Tests dokumentieren. Die interaktive Website liefert dafür bislang ein Erklärmodell, keine gemessenen Ergebnisse.",
+      "Alle fachlichen Quellen sind direkt verlinkt und stehen im Handout. Die verwendeten Originalgrafiken, ihre Herkunft und Lizenzhinweise sind in ATTRIBUTION.md dokumentiert.\n\nDer ausführbare Laboraufbau und die Python- und YAML-Dateien liegen im Repository. Lokal erfasste Messprotokolle bleiben unter lab/evidence; sie enthalten Zeitstempel, Befehle, Ausgaben und die originalen Hubble-Flows.",
   },
 ];
 export const questions = [

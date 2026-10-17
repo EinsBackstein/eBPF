@@ -1,35 +1,17 @@
-# Prüfung der Präsentationsansicht
+# Browserprüfung — 17. Oktober 2026
 
-Stand: 17.10.2026, nach der gestalterischen und didaktischen Überarbeitung anhand von Cilium und Cloudflare Docs. Siehe [Designanalyse](DESIGN-ANALYSE.md).
+Geprüft über den echten lokalen Browser unter `http://127.0.0.1:5173/`, mit einer separaten Zuschaueransicht. Keine Browser-Simulation als Testersatz.
 
-## Browserprüfung
+- Alle 15 Folien durch die Präsentationsnavigation geprüft. Ein Überlauf der Ergebnistabelle wurde behoben; danach kein Überlauf des Folienkörpers.
+- Originalgrafiken auf Titel-, Grundlagen-, JIT-, Map- und Laborfolie vollständig geladen.
+- Jede Seite aller fünf Quelldateien in der geteilten Codeansicht geprüft: kein vertikaler Überlauf des Codefensters. Quellzeilennummern bleiben erhalten.
+- Wiederholungsfolie mit allen drei eingeblendeten Antworten geprüft: kein Überlauf.
+- Referentenansicht bei **1135 × 853** mit **30 px** Sprechtext geprüft: Dokumentüberlauf 0 px; sichtbarer Notiztext 127 px kürzer als der verfügbare Bereich. Laborsteuerung endet bei y=725; Fußleiste beginnt bei y=793. Keine Notiz oder Laborsteuerung erfordert Seitenscrollen.
+- Folienwechsel und Auswahl der Laboransicht im Zuschauerfenster beobachtet. Dort keine Referentennotizen.
+- Echte Hubble UI mit Namespace `ebpf-talk` im Publikum eingebettet: Clients `client-a`/`client-b`, Servicegruppe `web`, Port 8080 und Flowtabelle sichtbar. Der aktuelle Hubble-Release verwendet `/?namespace=ebpf-talk`; der alte Dokumentationspfad `/ebpf-talk` führte zu 404 und wurde ersetzt.
+- Über die Website die Policy eingeschränkt und Client B erneut angefragt. Tatsächlicher Exitcode 1 / TimeoutError; integrierte Hubble-Ansicht zeigte aktuelle `DROPPED / POLICY_DENIED`-Ereignisse mit Quelle `client-b`, Label `role=guest`, Ziel-Web-Pod und TCP/8080.
+- Die native Hubble UI bleibt während einer Aktion geöffnet, damit neue Flows live erscheinen. Zoom/Filter der nativen Hubble UI sind unabhängig zwischen den Fenstern; die integrierte Flow-Auswahl ist synchronisiert.
 
-| Prüfung                                                                                  | Ergebnis                                                                                                               |
-| ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| Alle 12 Versuchsvarianten und alle 68 Ablaufschritte in der Zuschaueransicht, 1600 × 900 | Inspector, Diagramm und Auswertung passen in das feste Folienformat; keine Überdeckung des Quellenfußes.               |
-| Fünf Requests mit einer TCP-Verbindung                                                   | Alle Requests zeigen conn-01 und Backend A.                                                                            |
-| Fünf Requests mit fünf TCP-Verbindungen                                                  | Fünf conn-IDs; festes Beispiel A/B/B/A/B; zwei Backends sichtbar.                                                      |
-| Automatische Wiedergabe                                                                  | Schritt wird nach 2,4 Sekunden weitergeschaltet; Pause hält den aktuellen Schritt.                                     |
-| Getrenntes Zuschauerfenster                                                              | Folie, Versuch, Fortschritt und Ergebnisse sind synchron; Notizen und Experimentsteuerung werden nicht gerendert.      |
-| Zwei Referentenfenster                                                                   | Die Zuschaueransicht folgt dem zuletzt bedienten Fenster; ein inaktives Fenster setzt sie beim Heartbeat nicht zurück. |
-| 1280 × 720, Inter mit 30-Pixel-Sprechtext, alle 15 Folien und sämtliche Textabschnitte   | Kein Text- oder Seitenüberlauf; jeder Sprechtextabschnitt passt ohne Scrollen.                                         |
-| 390 × 844                                                                                | Kompakte Referentenansicht: Experimentsteuerung bleibt oberhalb der Notizen sichtbar, ohne Seiten- oder Textüberlauf.  |
-| 1135 × 853                                                                               | Referentenlayout mit fester Notizenspalte und separater Experimentsteuerung unter der Folie sichtbar.                  |
+Lokale Belegbilder liegen unter `.lab/screenshots/` (Git-ignoriert): `hubble-live.jpg`, `policy-code-result.jpg`, `policy-flow-proof.jpg`, `macbook-notes.jpg`.
 
-Die Bildschirmprüfung verwendet DOM-Abmessungen zusätzlich zur visuellen Kontrolle. Die Schriften werden lokal geladen. Die SVG-Bewegung wird bei aktivierter Einstellung für reduzierte Bewegung ausgeblendet; die statische Pfadmarkierung und die Texte bleiben erhalten.
-
-## Modelltests
-
-Sieben Tests prüfen:
-
-1. Wiederverwendung einer Verbindung mit unverändertem Backend.
-2. Neue Verbindungen mit separaten Backend-Zuordnungen.
-3. Policy ohne Regel, gesperrter Client, erlaubter Kontrollclient und Wiederherstellung.
-4. XDP-Filter auf 9090, Kontrollport 8080 und Rücknahme. XDP_PASS erzeugt keine erfundene HTTP-Antwort.
-5. Beobachtung einer Antwort erst nach der Zuordnung.
-6. Vollständige, endliche Abläufe und zur Entscheidung passende Vorhersageantworten.
-7. Ablehnung beschädigter oder außerhalb der Grenzen liegender gespeicherter Zustände.
-
-TypeScript-Prüfung, Vite-Produktionsbuild und Modelltests sind lokal ausgeführt.
-
-Die Prüfung verwendet Browserfenster. Das Verschieben auf einen physischen zweiten Monitor und das Teilen über eine Konferenz-App hängen vom jeweiligen macOS-/Browser-Setup ab. Sämtliche Pakete, Antworten und Zuordnungen der Experimente sind Modelldaten; die Website führt keinen Linux-eBPF-Datenpfad aus.
+Build, Modell-/Parserprüfungen und tatsächliche Laborprüfungen werden getrennt dokumentiert. Das ausführbare Live-Testskript und dessen letzte verifizierte Ergebnisse stehen in [LAB-VERIFICATION.md](LAB-VERIFICATION.md).

@@ -1,0 +1,22 @@
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: web-access
+  namespace: ebpf-talk
+spec:
+  endpointSelector:
+    matchLabels:
+      app: web
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            component: client
+            role: trusted
+      toPorts:
+        - ports:
+            - port: "8080"
+              protocol: TCP
+          rules:
+            http:
+              - method: GET
+                path: "/"
