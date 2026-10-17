@@ -302,11 +302,15 @@ export default function App() {
           eBPF <span>· Linux-Netzwerke</span>
         </span>
         <div className="app-actions">
-          <button onClick={() => setModal("overview")}>
+          <button aria-label="Folien" onClick={() => setModal("overview")}>
             <Grid2X2 size={17} />
             <span>Folien</span>
           </button>
-          <button aria-pressed={notes} onClick={() => setNotes((v) => !v)}>
+          <button
+            aria-label="Sprechtext"
+            aria-pressed={notes}
+            onClick={() => setNotes((v) => !v)}
+          >
             <StickyNote size={17} />
             <span>Sprechtext</span>
           </button>
