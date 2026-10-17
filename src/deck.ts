@@ -156,7 +156,7 @@ export const slides: Slide[] = [
       "Die beiden Clients sprechen dieselbe Service-Adresse an. Hinter ihr stehen zwei Python-Webserver. Die Antwort enthält den Backend-Namen, damit wir erkennen, welcher Server eine Anfrage bedient hat.\n\nIm geplanten Linux-Labor übernimmt Cilium den Datenpfad und Hubble zeigt die Flows. Die Website bildet diese Effekte bisher im Browser nach. Der eigene XDP-Portfilter gehört in ein separates Testnetz und wird nicht in den Cilium-Datenpfad eingebaut.",
   },
   {
-    title: "A: Verbindungen beobachten",
+    title: "Welche Instanz beantwortet diese Anfrage?",
     short: "A · Beobachten",
     section: "Praxis",
     time: "03:00",
@@ -167,10 +167,10 @@ export const slides: Slide[] = [
       "Im Linux-Labor: Backend-Antwort und passenden Hubble-Flow vergleichen.",
     ],
     notes:
-      "Ich erzeuge jetzt eine neue Verbindung von Client A. Im Modell sehen wir die Entscheidung und das ausgewählte Backend. Mit Client B wiederholen wir den Versuch.\n\nIm echten Labor würden wir zusätzlich die HTTP-Antwort und die Hubble-Flowdetails vergleichen. Die Antwort nennt den tatsächlich bedienenden Backend-Prozess. Die Browserereignisse sind simuliert und belegen noch keine Kommunikation in einer Linux-VM.",
+      "Zuerst fragen wir, ob die Service-Adresse das antwortende Backend verrät. Wir halten die Vorhersage fest und gehen dann Schritt für Schritt vor: Verbindungsaufbau, Backend-Zuordnung, Antwort und Auswertung.\n\nDie Antwort backend-a wird mit Quelle und Route korreliert. Anschließend verfolgen wir Client B. Die Adressen und Ereignisse sind Modelldaten. Im Linux-Labor würden wir genau diese Verbindung mit Hubble und der echten HTTP-Antwort abgleichen.",
   },
   {
-    title: "B: Neue Verbindungen auf Backends verteilen",
+    title: "Fünf HTTP-Anfragen: eine oder fünf Verbindungen?",
     short: "B · Lastverteilung",
     section: "Praxis",
     time: "04:00",
@@ -181,10 +181,10 @@ export const slides: Slide[] = [
       "Mehrere HTTP-Anfragen auf derselben TCP-Verbindung bedeuten keine neue Backend-Auswahl.",
     ],
     notes:
-      "Jetzt erzeugen wir mehrere neue Verbindungen an dieselbe Service-Adresse. Die Backend-Namen werden gezählt. Das Modell wählt zufällig; eine kleine Stichprobe muss nicht genau zur Hälfte auf beide Backends fallen.\n\nWichtig ist die neue TCP-Verbindung. Mehrere HTTP-Anfragen können eine bestehende Verbindung weiterverwenden und beim selben Backend bleiben. Im Linux-Labor müssen wir deshalb neue Verbindungen und die tatsächlichen Antworten kontrollieren.",
+      "Wir vergleichen zwei Fälle mit jeweils fünf HTTP-Anfragen. Zuerst verwenden alle dieselbe TCP-Verbindung: conn-01 bleibt Backend A zugeordnet. Danach öffnen wir für jede Anfrage eine neue Verbindung.\n\nJetzt erscheinen fünf conn-IDs und im Beispiel beide Backends. Die fest gewählte Beispielverteilung ist keine versprochene Quote. Das Lernziel ist der Unterschied zwischen HTTP-Anfrage und TCP-Verbindung. Die Wiedergabe lässt sich jederzeit pausieren oder einzeln weiterschalten.",
   },
   {
-    title: "C: Zugriff mit einer Netzwerkregel begrenzen",
+    title: "Was sieht ein blockierter Client?",
     short: "C · Netzwerkregel",
     section: "Praxis",
     time: "05:00",
@@ -195,10 +195,10 @@ export const slides: Slide[] = [
       "Client B testen → Regel entfernen → Zugriff erneut testen.",
     ],
     notes:
-      "Ohne Regel dürfen beide Clients zugreifen. Ich aktiviere jetzt die modellierte Ingress-Regel und teste Client B: Seine neue Verbindung wird blockiert. Client A bleibt als Kontrollfall erlaubt.\n\nDanach nehme ich die Regel zurück und teste Client B erneut. Im echten Labor warten wir auf die Policy-Übernahme und suchen den passenden Hubble-Drop. Diese Regel kontrolliert Netzwerkzugriff; sie ersetzt keine Anmeldung in der Webanwendung.",
+      "Wir führen vier Versuche aus: Client B ohne Regel, Client B mit Regel, Client A als erlaubte Kontrolle und Client B nach Rücknahme. Vor jeder Ausführung fragen wir nach der erwarteten Entscheidung.\n\nIm Inspector sehen wir Quelle und aktive Regel. Bei einem Drop endet der Pfad vor dem Dienst. Der Client erhält keinen HTTP-403-Status, weil der Webserver den Request nicht verarbeitet. Die abgeschlossenen Fälle werden unten als Vergleich festgehalten.",
   },
   {
-    title: "D: TCP-Port 9090 mit XDP filtern",
+    title: "Wo endet ein verworfenes Paket?",
     short: "D · XDP-Portfilter",
     section: "Praxis",
     time: "03:00",
@@ -209,7 +209,7 @@ export const slides: Slide[] = [
       "Filter deaktivieren und die Erreichbarkeit erneut prüfen.",
     ],
     notes:
-      "Hier wechseln wir zum separaten XDP-Modell. Zuerst sende ich ohne Filter an Port 9090. Dann aktiviere ich die Regel: Weitere Pakete an 9090 werden verworfen und der DROP-Zähler steigt.\n\nPort 8080 bleibt als Kontrollport erlaubt. Nach dem Deaktivieren muss auch 9090 wieder durchgelassen werden. Im Linux-Versuch würden wir die beiden Dienste und Map-Zähler prüfen. Diese XDP-Drops sind keine Hubble-Policy-Drops.",
+      "Wir lesen zuerst den Zielport des modellierten Pakets, schlagen die Regel-Map nach und vergleichen den Wert. Erst danach erscheint PASS oder DROP. Wir vergleichen 9090 ohne Filter, 9090 gesperrt, 8080 als Kontrolle und 9090 nach Rücknahme.\n\nBei DROP endet der Pfad am XDP-Hook und der DROP-Zähler wird erhöht. PASS erlaubt nur die weitere Verarbeitung; es belegt noch keine HTTP-Antwort. Alle Schritte sind simuliert, keine Ausführung im Linux-Kernel.",
   },
   {
     title: "Welche Ergebnisse müssen wir nachweisen?",

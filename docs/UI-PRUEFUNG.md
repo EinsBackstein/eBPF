@@ -1,26 +1,35 @@
 # Prüfung der Präsentationsansicht
 
-Stand: 17.10.2026. Nach der Überarbeitung von Website-Navigation zu einer festen Folien- und Referentenansicht.
+Stand: 17.10.2026, nach der gestalterischen und didaktischen Überarbeitung anhand von Cilium und Cloudflare Docs. Siehe [Designanalyse](DESIGN-ANALYSE.md).
 
-## Im Browser geprüft
+## Browserprüfung
 
-| Größe      | Prüfung                                                 | Ergebnis                                                                      |
-| ---------- | ------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| 1135 × 853 | Alle 15 Folien; 22-Pixel-Sprechtext                     | Kein Seiten- oder Sprechtextüberlauf; Folieninhalt im festen 16:9-Raster      |
-| 1280 × 720 | Alle Sprechtextabschnitte aller 15 Folien bei 30 Pixeln | Jeder angezeigte Abschnitt passt; Wechsel über Abschnittspfeile ohne Scrollen |
-| 390 × 844  | Gestapelte Referentenansicht, 22-Pixel-Sprechtext       | Kein horizontaler oder vertikaler Seitenüberlauf; Text in Abschnitten         |
-| 1600 × 900 | Separate Zuschaueransicht                               | Reine Folie, keine Notizen oder Simulationssteuerung                          |
-| 1600 × 900 | Alle drei Antworten eingeblendet                        | Inhalt passt vollständig auf die Fragenfolie                                  |
-| 1600 × 900 | XDP-Demo mit Ereignissen                                | Zähler, Ereignistabelle und Stichpunkte überlappen nicht                      |
+| Prüfung                                                                                  | Ergebnis                                                                                                               |
+| ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Alle 12 Versuchsvarianten und alle 68 Ablaufschritte in der Zuschaueransicht, 1600 × 900 | Inspector, Diagramm und Auswertung passen in das feste Folienformat; keine Überdeckung des Quellenfußes.               |
+| Fünf Requests mit einer TCP-Verbindung                                                   | Alle Requests zeigen conn-01 und Backend A.                                                                            |
+| Fünf Requests mit fünf TCP-Verbindungen                                                  | Fünf conn-IDs; festes Beispiel A/B/B/A/B; zwei Backends sichtbar.                                                      |
+| Automatische Wiedergabe                                                                  | Schritt wird nach 2,4 Sekunden weitergeschaltet; Pause hält den aktuellen Schritt.                                     |
+| Getrenntes Zuschauerfenster                                                              | Folie, Versuch, Fortschritt und Ergebnisse sind synchron; Notizen und Experimentsteuerung werden nicht gerendert.      |
+| Zwei Referentenfenster                                                                   | Die Zuschaueransicht folgt dem zuletzt bedienten Fenster; ein inaktives Fenster setzt sie beim Heartbeat nicht zurück. |
+| 1280 × 720, Inter mit 30-Pixel-Sprechtext, alle 15 Folien und sämtliche Textabschnitte   | Kein Text- oder Seitenüberlauf; jeder Sprechtextabschnitt passt ohne Scrollen.                                         |
+| 390 × 844                                                                                | Kompakte Referentenansicht: Experimentsteuerung bleibt oberhalb der Notizen sichtbar, ohne Seiten- oder Textüberlauf.  |
+| 1135 × 853                                                                               | Referentenlayout mit fester Notizenspalte und separater Experimentsteuerung unter der Folie sichtbar.                  |
 
-Synchronisierung wurde in zwei getrennten Browser-Tabs desselben Profils geprüft: Folienwechsel, PASS-/DROP-Zähler, Portwahl, Antworten und Schwarzbild. Beispiel XDP: ein erlaubtes Paket an 9090 vor der Sperre, zehn verworfene Pakete an 9090 nach der Sperre, ein erlaubtes Paket an 8080 ergeben 12 gesendete Pakete, 2 PASS und 10 DROP.
+Die Bildschirmprüfung verwendet DOM-Abmessungen zusätzlich zur visuellen Kontrolle. Die Schriften werden lokal geladen. Die SVG-Bewegung wird bei aktivierter Einstellung für reduzierte Bewegung ausgeblendet; die statische Pfadmarkierung und die Texte bleiben erhalten.
 
-Die Sprechtextprüfung misst den verfügbaren Bereich und den tatsächlichen Textüberlauf im Browser. Bei großer Schrift werden die mitgelieferten Texte auf mehrere Abschnitte verteilt. Die Schrift wird nicht automatisch verkleinert.
+## Modelltests
 
-## Technisch geprüft
+Sieben Tests prüfen:
 
-- TypeScript-Prüfung und Vite-Produktionsbuild erfolgreich.
-- Vier Tests für Filterentscheidungen, Netzwerkregel, Zähler und gespeicherten Zustand erfolgreich.
-- Simulierte Service-Verbindungsversuche beziehen sich auf den Dienstport 8080; XDP-Pakete auf den gewählten Port.
+1. Wiederverwendung einer Verbindung mit unverändertem Backend.
+2. Neue Verbindungen mit separaten Backend-Zuordnungen.
+3. Policy ohne Regel, gesperrter Client, erlaubter Kontrollclient und Wiederherstellung.
+4. XDP-Filter auf 9090, Kontrollport 8080 und Rücknahme. XDP_PASS erzeugt keine erfundene HTTP-Antwort.
+5. Beobachtung einer Antwort erst nach der Zuordnung.
+6. Vollständige, endliche Abläufe und zur Entscheidung passende Vorhersageantworten.
+7. Ablehnung beschädigter oder außerhalb der Grenzen liegender gespeicherter Zustände.
 
-Die Prüfung verwendet Browserfenster. Das manuelle Verschieben auf einen physischen zweiten Monitor und das Teilen über eine Konferenz-App hängen vom jeweiligen macOS-/Browser-Setup ab. Ein echter Linux-eBPF-Datenpfad ist nicht Bestandteil dieser Browser-Simulation.
+TypeScript-Prüfung, Vite-Produktionsbuild und Modelltests sind lokal ausgeführt.
+
+Die Prüfung verwendet Browserfenster. Das Verschieben auf einen physischen zweiten Monitor und das Teilen über eine Konferenz-App hängen vom jeweiligen macOS-/Browser-Setup ab. Sämtliche Pakete, Antworten und Zuordnungen der Experimente sind Modelldaten; die Website führt keinen Linux-eBPF-Datenpfad aus.

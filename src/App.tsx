@@ -2,7 +2,6 @@ import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
-  Check,
   ChevronLeft,
   ChevronRight,
   CircleHelp,
@@ -18,36 +17,52 @@ import {
   X,
 } from "lucide-react";
 import { slides, sources, questions } from "./deck";
-import { initialLab, sendPackets, readSnapshot } from "./model.mjs";
-import "@fontsource-variable/dm-sans/wght.css";
-import "@fontsource/ibm-plex-mono/latin-400.css";
-import "@fontsource/ibm-plex-mono/latin-500.css";
+import {
+  initialExperiment,
+  readPresentation,
+  caseFor,
+  buildTrace,
+} from "./experiment-model.mjs";
+import {
+  ExperimentSlide,
+  ExperimentControls,
+  type ExperimentState,
+} from "./Experiments";
+import { KernelIllustration } from "./Illustrations";
+import "@fontsource-variable/inter";
+import "@fontsource-variable/jetbrains-mono";
 import "./styles.css";
+import "./theme.css";
 
-type PacketEvent = {
-  id: number;
-  action: string;
-  reason: string;
-  backend: string | null;
-  port: number;
-  client: string;
+type Snapshot = {
+  index: number;
+  black: boolean;
+  experiment: ExperimentState;
+  answers: number[];
 };
-type Lab = Omit<typeof initialLab, "events"> & { events: PacketEvent[] };
-type Snapshot = { index: number; black: boolean; lab: Lab; answers: number[] };
-const KEY = "ebpf-deck-v1";
+const KEY = "ebpf-deck-v2";
 const audience =
   new URLSearchParams(location.search).get("view") === "audience";
-const freshLab = (): Lab => ({ ...initialLab, events: [] });
 function stored(): Snapshot {
   try {
     return (
-      (readSnapshot(
+      (readPresentation(
         JSON.parse(localStorage.getItem(KEY) || "null"),
         slides.length,
-      ) as Snapshot) || { index: 0, black: false, lab: freshLab(), answers: [] }
+      ) as Snapshot) || {
+        index: 0,
+        black: false,
+        experiment: initialExperiment(),
+        answers: [],
+      }
     );
   } catch {
-    return { index: 0, black: false, lab: freshLab(), answers: [] };
+    return {
+      index: 0,
+      black: false,
+      experiment: initialExperiment(),
+      answers: [],
+    };
   }
 }
 function readNotes(): Record<number, string> {
@@ -70,18 +85,45 @@ export default function App() {
   const [connected, setConnected] = useState(false);
   const [notice, setNotice] = useState("");
   const channel = useRef<BroadcastChannel | null>(null);
+  const controller = useRef(crypto.randomUUID());
+  const ownsControl = () => {
+    try {
+      return localStorage.getItem(KEY + "-controller") === controller.current;
+    } catch {
+      return true;
+    }
+  };
+  const claimControl = () => {
+    try {
+      localStorage.setItem(KEY + "-controller", controller.current);
+    } catch {
+      /* BroadcastChannel still works */
+    }
+  };
+  const mutate = (update: (s: Snapshot) => Snapshot) => {
+    claimControl();
+    setState(update);
+  };
   const current = useRef(state);
   current.current = state;
   const lastAudience = useRef(0);
   const origin = useRef(0);
   const elapsed = useRef(0);
   const slide = slides[state.index];
-  const mode = state.index === 11 ? "xdp" : "network";
+  const [playing, setPlaying] = useState(false);
+  const trace = buildTrace(caseFor(state.index, state.experiment.caseIndex));
   const speak =
     typeof customNotes[state.index] === "string"
       ? customNotes[state.index]
       : slide.notes;
   useEffect(() => {
+    if (!audience) {
+      try {
+        if (!localStorage.getItem(KEY + "-controller")) claimControl();
+      } catch {
+        /* no persistent storage */
+      }
+    }
     let bus: BroadcastChannel | null = null;
     try {
       bus = new BroadcastChannel(KEY);
@@ -92,20 +134,20 @@ export default function App() {
     if (bus)
       bus.onmessage = (e) => {
         const m = e.data || {};
-        if (m.type === "hello" && !audience) {
+        if (m.type === "hello" && !audience && ownsControl()) {
           lastAudience.current = Date.now();
           setConnected(true);
           bus?.postMessage({ type: "state", value: current.current });
         }
         if (m.type === "state" && audience) {
-          const next = readSnapshot(m.value, slides.length);
+          const next = readPresentation(m.value, slides.length);
           if (next) setState(next as Snapshot);
         }
       };
     const storage = (e: StorageEvent) => {
       if (audience && e.key === KEY) {
         try {
-          const next = readSnapshot(
+          const next = readPresentation(
             JSON.parse(e.newValue || "null"),
             slides.length,
           );
@@ -119,7 +161,8 @@ export default function App() {
     if (audience) bus?.postMessage({ type: "hello" });
     const heartbeat = setInterval(() => {
       if (audience) bus?.postMessage({ type: "hello" });
-      else setConnected(Date.now() - lastAudience.current < 6500);
+      else
+        setConnected(ownsControl() && Date.now() - lastAudience.current < 6500);
     }, 2000);
     return () => {
       clearInterval(heartbeat);
@@ -129,7 +172,7 @@ export default function App() {
     };
   }, []);
   useEffect(() => {
-    if (!audience) {
+    if (!audience && ownsControl()) {
       try {
         localStorage.setItem(KEY, JSON.stringify(state));
       } catch {
@@ -161,11 +204,12 @@ export default function App() {
   const go = (target: number) => {
     if (audience) return;
     const index = Math.max(0, Math.min(slides.length - 1, target));
-    setState((s) => ({
+    setPlaying(false);
+    mutate((s) => ({
       ...s,
       index,
       black: false,
-      lab: (s.index === 11) !== (index === 11) ? freshLab() : s.lab,
+      experiment: s.index !== index ? initialExperiment() : s.experiment,
     }));
   };
   const fullscreen = () => {
@@ -216,13 +260,14 @@ export default function App() {
       }
       if (e.key.toLowerCase() === "n") setNotes((v) => !v);
       if (e.key.toLowerCase() === "b")
-        setState((s) => ({ ...s, black: !s.black }));
+        mutate((s) => ({ ...s, black: !s.black }));
       if (e.key === "?") setModal("help");
     };
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
   }, [modal]);
   function openAudience() {
+    claimControl();
     const url = new URL(location.href);
     url.search = "?view=audience";
     const win = window.open(
@@ -264,12 +309,60 @@ export default function App() {
     link.click();
     setTimeout(() => URL.revokeObjectURL(link.href), 1000);
   }
-  const updateLab = (patch: Partial<Lab>) =>
-    setState((s) => ({ ...s, lab: { ...s.lab, ...patch } }));
-  const send = (n: number) =>
-    setState((s) => ({ ...s, lab: sendPackets(s.lab, mode, n) }));
+  const chooseCase = (caseIndex: number) => {
+    setPlaying(false);
+    mutate((s) => ({
+      ...s,
+      experiment: { ...s.experiment, caseIndex, step: 0, prediction: null },
+    }));
+  };
+  const moveStep = (delta: number) =>
+    mutate((s) => {
+      const last =
+        buildTrace(caseFor(s.index, s.experiment.caseIndex)).length - 1;
+      const step = Math.max(0, Math.min(last, s.experiment.step + delta));
+      return {
+        ...s,
+        experiment: {
+          ...s.experiment,
+          step,
+          completed:
+            step === last
+              ? [
+                  ...new Set([
+                    ...s.experiment.completed,
+                    s.experiment.caseIndex,
+                  ]),
+                ]
+              : s.experiment.completed,
+        },
+      };
+    });
+  useEffect(() => {
+    if (!playing || audience || modal || state.black) return;
+    if (!ownsControl()) {
+      setPlaying(false);
+      return;
+    }
+    if (state.experiment.step >= trace.length - 1) {
+      setPlaying(false);
+      return;
+    }
+    const id = setTimeout(() => {
+      if (ownsControl()) moveStep(1);
+      else setPlaying(false);
+    }, 2400);
+    return () => clearTimeout(id);
+  }, [
+    playing,
+    state.experiment.step,
+    state.experiment.caseIndex,
+    state.index,
+    modal,
+    state.black,
+  ]);
   const toggleAnswer = (i: number) =>
-    setState((s) => ({
+    mutate((s) => ({
       ...s,
       answers: s.answers.includes(i)
         ? s.answers.filter((v) => v !== i)
@@ -277,7 +370,11 @@ export default function App() {
     }));
   const time = `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
   const deck = (
-    <SlideContent index={state.index} lab={state.lab} answers={state.answers} />
+    <SlideContent
+      index={state.index}
+      experiment={state.experiment}
+      answers={state.answers}
+    />
   );
   if (audience)
     return (
@@ -341,12 +438,22 @@ export default function App() {
             </div>
           )}
           {slide.kind === "lab" && (
-            <LabControls
-              mode={mode}
-              lab={state.lab}
-              updateLab={updateLab}
-              send={send}
-              reset={() => setState((s) => ({ ...s, lab: freshLab() }))}
+            <ExperimentControls
+              index={state.index}
+              state={state.experiment}
+              playing={playing}
+              choose={chooseCase}
+              move={moveStep}
+              predict={(prediction) =>
+                mutate((s) => ({
+                  ...s,
+                  experiment: { ...s.experiment, prediction },
+                }))
+              }
+              togglePlay={() => {
+                claimControl();
+                setPlaying((v) => !v);
+              }}
             />
           )}
           {slide.kind === "questions" && (
@@ -464,7 +571,7 @@ export default function App() {
         </span>
         <button
           aria-pressed={state.black}
-          onClick={() => setState((s) => ({ ...s, black: !s.black }))}
+          onClick={() => mutate((s) => ({ ...s, black: !s.black }))}
           title="Zuschauerbild schwarz (B)"
         >
           <span className="black-icon" />
@@ -572,6 +679,8 @@ export default function App() {
                 </li>
               </ol>
               <p>
+                In den Praxisfolien werden Versuche ausgewählt, Vorhersagen
+                festgehalten und Abläufe schrittweise gezeigt oder abgespielt.
                 Der Sprechtext bleibt auf dem MacBook. Er hat einen festen
                 Platz; längere Texte werden in Abschnitte aufgeteilt.
               </p>
@@ -885,22 +994,25 @@ function Topology() {
 }
 function SlideContent({
   index,
-  lab,
+  experiment,
   answers,
 }: {
   index: number;
-  lab: Lab;
+  experiment: ExperimentState;
   answers: number[];
 }) {
   const s = slides[index];
   return (
     <article
-      className={`slide slide-${s.kind}`}
+      className={`slide slide-${s.kind} chapter-${s.section.toLowerCase()}`}
       aria-label={`Folie ${index + 1}: ${s.title}`}
     >
       {s.kind === "title" ? (
         <>
-          <div className="title-subject">Linux-Netzwerke</div>
+          <div className="title-subject">
+            <span className="chapter-mark" /> Linux-Netzwerke · eBPF
+          </div>
+          <KernelIllustration />
           <h1>eBPF</h1>
           <p className="title-subtitle">
             Netzwerkverkehr beobachten,
@@ -919,6 +1031,10 @@ function SlideContent({
       ) : (
         <>
           <header className="slide-header">
+            <div className="slide-kicker">
+              <span className="chapter-mark" />
+              {s.section} <span>/ {String(index + 1).padStart(2, "0")}</span>
+            </div>
             <h1>{s.title}</h1>
           </header>
           <div className="slide-body">
@@ -1181,13 +1297,7 @@ function SlideContent({
               </>
             )}
             {s.kind === "lab" && (
-              <>
-                <div className="simulation-label">
-                  Browser-Simulation · keine Linux-Messung
-                </div>
-                <LabSlide lab={lab} index={index} />
-                <BulletList items={s.bullets} />
-              </>
+              <ExperimentSlide index={index} state={experiment} />
             )}
             {s.kind === "results" && (
               <>
@@ -1268,189 +1378,5 @@ function SlideContent({
         </span>
       </footer>
     </article>
-  );
-}
-
-function LabSlide({ lab, index }: { lab: Lab; index: number }) {
-  const xdp = index === 11;
-  const dropped = xdp
-    ? lab.filter && lab.port === 9090
-    : lab.policy && lab.client === "guest";
-  return (
-    <div className={`lab-slide ${xdp ? "xdp" : ""}`}>
-      <div className="lab-main">
-        {xdp ? (
-          <>
-            <div className="packet-route">
-              <FlowNode label={`TCP / ${lab.port}`} detail="Paket am Empfang" />
-              <Arrow />
-              <FlowNode
-                label="XDP-Portregel"
-                detail={lab.filter ? "9090 gesperrt" : "Filter deaktiviert"}
-                accent
-              />
-              <Arrow />
-              <div className={`verdict ${dropped ? "drop" : "pass"}`}>
-                <strong>{dropped ? "DROP" : "PASS"}</strong>
-                <span>{dropped ? "verwerfen" : "weiterreichen"}</span>
-              </div>
-            </div>
-            <div className="rule-code">
-              <span>Pseudocode</span>
-              <code>
-                wenn Filter aktiv und TCP-Zielport = 9090: DROP
-                <br />
-                sonst: PASS
-              </code>
-            </div>
-          </>
-        ) : (
-          <>
-            <Topology />
-            {index === 10 ? (
-              <div className="policy-summary">
-                <strong>
-                  Ingress-Regel: {lab.policy ? "aktiv" : "inaktiv"}
-                </strong>
-                <span>
-                  {lab.policy
-                    ? "Client A → erlaubt · Client B → blockiert"
-                    : "Client A und Client B → erlaubt"}
-                </span>
-              </div>
-            ) : (
-              <div className="backend-summary">
-                <span>Backend-Antworten</span>
-                <strong>A: {lab.a}</strong>
-                <strong>B: {lab.b}</strong>
-              </div>
-            )}
-          </>
-        )}
-        <div className="packet-counters">
-          <div>
-            <span>{xdp ? "Pakete gesendet" : "Verbindungsversuche"}</span>
-            <strong>{lab.sent}</strong>
-          </div>
-          <div>
-            <span>{xdp ? "PASS" : "Erlaubt"}</span>
-            <strong className="pass">{lab.pass}</strong>
-          </div>
-          <div>
-            <span>{xdp ? "DROP" : "Blockiert"}</span>
-            <strong className="drop">{lab.drop}</strong>
-          </div>
-        </div>
-      </div>
-      <div className="event-table">
-        <h2>{xdp ? "Letzte Pakete" : "Letzte Versuche"}</h2>
-        {lab.events.length ? (
-          <table>
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>{xdp ? "Port" : "Quelle"}</th>
-                <th>Ergebnis</th>
-              </tr>
-            </thead>
-            <tbody>
-              {lab.events.slice(0, 4).map((e) => (
-                <tr key={e.id}>
-                  <td>{e.id}</td>
-                  <td>
-                    {xdp
-                      ? e.port
-                      : e.client === "trusted"
-                        ? "Client A"
-                        : "Client B"}
-                  </td>
-                  <td className={e.action === "DROP" ? "drop" : "pass"}>
-                    {e.action === "DROP"
-                      ? "DROP"
-                      : xdp
-                        ? "PASS"
-                        : `Backend ${e.backend?.toUpperCase()}`}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : (
-          <p className="empty-events">
-            Noch keine {xdp ? "Pakete" : "Verbindungen"}.<br />
-            Über die Referentenansicht erzeugen.
-          </p>
-        )}
-      </div>
-    </div>
-  );
-}
-function LabControls({
-  mode,
-  lab,
-  updateLab,
-  send,
-  reset,
-}: {
-  mode: string;
-  lab: Lab;
-  updateLab: (p: Partial<Lab>) => void;
-  send: (n: number) => void;
-  reset: () => void;
-}) {
-  const xdp = mode === "xdp",
-    active = xdp ? lab.filter : lab.policy;
-  return (
-    <section className="lab-controls" aria-label="Simulation steuern">
-      <div>
-        <label>
-          {xdp ? "Zielport" : "Quelle"}
-          <select
-            aria-label={xdp ? "TCP-Zielport" : "Quelle"}
-            value={xdp ? lab.port : lab.client}
-            onChange={(e) =>
-              updateLab(
-                xdp
-                  ? { port: Number(e.target.value) }
-                  : { client: e.target.value },
-              )
-            }
-          >
-            {xdp ? (
-              <>
-                <option value="9090">TCP / 9090</option>
-                <option value="8080">TCP / 8080</option>
-              </>
-            ) : (
-              <>
-                <option value="trusted">Client A</option>
-                <option value="guest">Client B</option>
-              </>
-            )}
-          </select>
-        </label>
-        <button
-          role="switch"
-          aria-checked={active}
-          className={`rule-switch ${active ? "active" : ""}`}
-          onClick={() =>
-            updateLab(xdp ? { filter: !lab.filter } : { policy: !lab.policy })
-          }
-        >
-          <span>{active ? <Check size={15} /> : null}</span>
-          {xdp ? "9090 sperren" : "Nur Client A erlauben"}
-        </button>
-      </div>
-      <div>
-        <button className="primary" onClick={() => send(1)}>
-          <Play size={15} />
-          {xdp ? "Paket senden" : "Verbinden"}
-        </button>
-        <button onClick={() => send(10)}>+10</button>
-        <button aria-label="Simulation zurücksetzen" onClick={reset}>
-          <RotateCcw size={17} />
-        </button>
-      </div>
-    </section>
   );
 }
