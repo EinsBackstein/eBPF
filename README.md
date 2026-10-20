@@ -49,33 +49,3 @@ Folien, Code-Datei und Scrollposition, ausgewählte Ansicht, Messergebnis, Flow-
 | B                               | Zuschauerbild schwarz / fortsetzen |
 | F                               | Vollbild                           |
 | ?                               | Hilfe                              |
-
-## Praxis: Code → Ausführung → Nachweis
-
-- **A · Beobachten:** `server.py` lesen, Client ausführen, Request-ID in Antwort und Backend-Log finden, Hubble-Flow zuordnen.
-- **B · Verteilen:** fünf HTTP-Anfragen über eine Verbindung mit zehn neu aufgebauten Verbindungen vergleichen. Backend-Namen sind gemessen; es gibt keine festgelegte Verteilungsfolge.
-- **C · Netzwerkregel:** offene Policy → B erfolgreich → `role: trusted` ergänzen → B Timeout / Hubble `POLICY_DENIED` → A erfolgreich → offene Policy → B wieder erfolgreich.
-- **D · Kernelzustand:** echte Pod-/Service-Adressen, Endpoint-Identitäten, BPF-LB-Map und BPF-Policy-Maps vergleichen.
-- **E · Eigener XDP-Filter:** Python setzt `blocked_port[0] = 9090`; 9090 läuft in einen Timeout, 8080 antwortet weiterhin. PASS/DROP werden direkt aus BPF-Maps gelesen. Regel aufheben und Zugriff erneut belegen.
-
-**Code groß** zeigt den Quelltext für das Publikum vergrößert. Die vollständige Datei ist scrollbar; Scrollposition und Zeilennummern bleiben in beiden Präsentationsfenstern zugeordnet. Mausrad, Tastatur oder die Scrollbuttons steuern den Ausschnitt. **Code + Ergebnis**, **Originalausgabe**, **Flowdetails** und **Backend-Logs** stellen unterschiedliche Nachweise dar. Die Messungsauswahl erlaubt den Vergleich vorheriger Befehle innerhalb der Sitzung. Vollständige Protokolle liegen lokal unter `lab/evidence/` (Git-ignoriert).
-
-Der XDP-Versuch läuft in einem separaten, netzwerkisolierten Docker-Container mit zwei Netzwerk-Namespaces und veth. Generic/SKB-XDP ist an dessen Server-Interface angebunden; Ciliums Datenpfad bleibt unabhängig. Diese Drops erscheinen nicht in Hubble. Der Container benötigt Privilegien zum Laden des BPF-Programms in der Linux-VM, hat aber keine Host-Netzwerkverbindung, Bind-Mounts oder veröffentlichten Ports. Der C-Quelltext wird vorab gebaut; im Vortrag wird Python gezeigt.
-
-## Gestaltung und Originalgrafiken
-
-Die Cilium-Hero-/Use-Case-Komponenten wurden anhand ihrer Originalquellen übertragen. Die technischen Folien verwenden Cloudflare Docs' originale OKLCH-Farben, Typografie, Codeflächen und Komponentenmaße, vergrößert für die Projektion. Die fünf Grundlagenfolien verwenden dasselbe Layout mit einer orangefarbenen Markierung für das aktuelle Thema. Verifier, JIT und Maps werden mit einfachen Ablaufbildern erklärt. Die Produktionsübersicht übernimmt das Kartenraster und die sechs Original-Logos von ebpf.io; die Einordnung steht im Sprechtext. Herkunft, Lizenzen und Anpassungen stehen in [public/vendor/ATTRIBUTION.md](public/vendor/ATTRIBUTION.md); der konkrete Abgleich in [docs/DESIGN-ANALYSE.md](docs/DESIGN-ANALYSE.md).
-
-## Prüfungen und Abgabe
-
-```sh
-npm test
-npm run build
-# Bei laufendem Labor und laufender Brücke:
-npm run lab:verify
-npm run lab:xdp:verify
-```
-
-Der Live-Test prüft Ausgangszustand, Request-ID-Korrelation, Keep-alive, neue Verbindungen, Policy-Drop, erlaubte Kontrolle, BPF-Maps und Wiederherstellung. Er setzt abschließend die offene Policy. Die Pipeline führt die lokalen Tests und den Build aus; ein Docker-Labor ist nicht Teil des GitHub-CI-Jobs.
-
-16 Folien, Richtzeit insgesamt 25:00 einschließlich Diskussion. Unter **Folien → Handout herunterladen** entsteht ein Markdown-Handout mit Folienpunkten, Standardsprechtexten, drei Fragen/Antworten und Quellen. Individuell bearbeitete Notizen werden nicht exportiert. Die ursprünglichen Vorgaben und die frühere Planung bleiben unter `docs/` als Projektunterlagen erhalten.
