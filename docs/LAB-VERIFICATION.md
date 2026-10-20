@@ -25,3 +25,27 @@ Zusätzlich geprüft: fremde Origin wird mit HTTP 403 abgelehnt, unbekannter Akt
 Die Backend-Verteilung ist eine Beobachtung dieses Laufs, keine garantierte Quote. Die Hubble-Erfassung ist auf den Zeitraum des Befehls und bis zu 80 Client-Ereignisse begrenzt. Mehrere Ereignisse können dasselbe Paket beschreiben; Ereignisanzahl und Paketanzahl werden nicht gleichgesetzt.
 
 Die ausführlichen JSON-Protokolle bleiben lokal unter `lab/evidence/` und werden nicht ins öffentliche Repository übertragen.
+
+
+## Ergänzung: eigener XDP-Filter — 20. Oktober 2026
+
+Cilium/Hubble am 20. Oktober erneut erfolgreich mit `npm run lab:verify` geprüft: alle elf Schritte inklusive Keep-alive, neuen Verbindungen, Policy-Drop, erlaubter Kontrolle, beiden Map-Inspektionen und Wiederherstellung. Zwei unterschiedliche Backend-Pods wurden tatsächlich erreicht.
+
+XDP-Prüfung: `2026-10-20T15:12:56.594Z` mit `npm run lab:xdp:verify`, nach erfolgreichem Docker-Neustart. Eigener Filter im **Generic/SKB-Modus**, veth zwischen zwei eigenen Netzwerk-Namespaces. Debian Bookworm ist im Dockerfile per Manifest-Digest fixiert; Pakete kommen aus dessen offiziellen APT-Repositories. Programm-ID in diesem Prüflauf: `11378`. Programm-ID, Map-IDs und tatsächlich angebundene Programm-ID wurden über alle Regeländerungen verglichen und blieben gleich.
+
+| Aktion | blocked_port[0] | Tatsächliches Ergebnis | ΔPASS | ΔDROP |
+| --- | --- | --- | --- | --- |
+| clear | 0 | Map gelesen / geändert | +0 | +0 |
+| test8080 | 0 | 200 | +6 | +0 |
+| test9090 | 0 | 200 | +7 | +0 |
+| block | 9090 | Map gelesen / geändert | +0 | +0 |
+| test9090 | 9090 | TimeoutError | +0 | +2 |
+| test8080 | 9090 | 200 | +6 | +0 |
+| clear | 0 | Map gelesen / geändert | +0 | +0 |
+| test9090 | 0 | 200 | +6 | +0 |
+
+SYN-Wiederholungen erklären mehrere Drops pro Test. PASS/DROP zählen parsebare, nicht fragmentierte IPv4-TCP-Pakete am Server-Eingang; die Messwerte sind keine HTTP-Request-Anzahl. Der Versuch erfasst keine Cilium-/Hubble-Ereignisse. Der Abschlussblock stellt die offene XDP-Regel auch nach fehlgeschlagenen Assertions wieder her.
+
+Zusätzliche Kernel-Fixtures über `BPF_PROG_TEST_RUN`: TCP/9090 → XDP_DROP; TCP/8080, abgeschnittener IP-Header, abgeschnittener TCP-Header, IPv4-Fragment und ARP → XDP_PASS. Diese künstlichen Pakete sind explizite Parser-/Programmrückgabe-Tests; die obige Tabelle stammt aus echten HTTP-/TCP-Versuchen im veth-Testnetz.
+
+Build und fünf lokale Tests erfolgreich. Die erneute visuelle Browserprüfung war durch die Browser-Sicherheitsrichtlinie blockiert; Details in UI-PRUEFUNG.md. Lokal erfasste JSON-Protokolle und kubeconfig bleiben Git-ignoriert.

@@ -42,7 +42,7 @@ export const slides: Slide[] = [
     title: "eBPF im Linux-Netzwerk",
     short: "Thema und Ablauf",
     section: "Einleitung",
-    time: "01:00",
+    time: "00:30",
     kind: "title",
     sourceIds: [0],
     bullets: [
@@ -200,15 +200,29 @@ export const slides: Slide[] = [
     title: "Was steht tatsächlich in den BPF-Maps?",
     short: "D · Kernelzustand",
     section: "Praxis",
-    time: "02:00",
+    time: "01:00",
     kind: "lab",
-    sourceIds: [6],
+    sourceIds: [0, 5],
     bullets: [
       "Service-IP und Backend-Adressen in der BPF-LB-Map zuordnen.",
       "Endpoint-Identitäten mit Policy-Einträgen vergleichen.",
     ],
     notes:
-      "Jetzt lesen wir den realen Kernelzustand. Pods und Service liefern die IP-Adressen; endpoint list liefert die zugehörigen Sicherheitsidentitäten. bpf lb list zeigt Service-Frontend und Backends.\n\nIn den Policy-Maps suchen wir die freigegebene Identität und den Port. Vergleiche die Map vor und nach der Label-Regel. Die Ausgabe ist umfangreich; wir lesen gezielt die relevanten Einträge. Cilium verwaltet diese Maps, Python schreibt sie in diesem Labor nicht selbst.",
+      "Jetzt lesen wir den realen Kernelzustand. Pods und Service liefern die IP-Adressen; endpoint list liefert die zugehörigen Sicherheitsidentitäten. bpf lb list zeigt Service-Frontend und Backends.\n\nIn den Policy-Maps suchen wir die freigegebene Identität und den Port. Vergleiche die Map vor und nach der Label-Regel. Die Ausgabe ist umfangreich; wir lesen gezielt die relevanten Einträge. Cilium verwaltet diese Maps. Im nächsten, separaten XDP-Versuch schreibt Python selbst in eine eigene Regel-Map.",
+  },
+  {
+    title: "XDP: eine Portregel ändern, Pakete zählen",
+    short: "E · Eigener XDP-Filter",
+    section: "Praxis",
+    time: "03:00",
+    kind: "lab",
+    sourceIds: [0, 6],
+    bullets: [
+      "Python schreibt Port 9090 in die Regel-Map; das XDP-Programm bleibt geladen.",
+      "9090 testen, 8080 als Kontrolle prüfen, Regel aufheben und 9090 erneut testen.",
+    ],
+    notes:
+      "Dieser Versuch läuft in einem separaten veth-Testnetz. Auf talk-server/eth0 ist unser eigener Filter im Generic/SKB-Modus angebunden. Er ist unabhängig von Cilium und meldet keine Hubble-Flows. Der C-Quelltext wird vorab kompiliert; im Vortrag zeigen wir Python.\n\nZuerst beide Ports erfolgreich testen. In control.py schreibt block den Wert 9090 in blocked_port[0]. Das Programm wird dabei nicht neu geladen. Jetzt 9090 testen: Der TCP-Aufbau läuft in einen Timeout, während DROP steigt. 8080 muss weiterhin HTTP 200 liefern und PASS erhöhen.\n\nclear setzt den Map-Wert auf 0. 9090 muss wieder antworten. Vergleiche die Programm-ID vor und nach der Änderung. Die Zähler erfassen geprüfte IPv4-TCP-Pakete am Server-Eingang, keine HTTP-Anfragen. SYN-Wiederholungen können mehrere Drops pro Test erzeugen. Generic XDP ist hier ein Funktionsnachweis, kein Performance-Benchmark.",
   },
   {
     title: "Welche Ergebnisse müssen wir nachweisen?",

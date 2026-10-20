@@ -68,25 +68,47 @@ Es gibt keinen HTTP-403-Status für den blockierten TCP-Aufbau, weil der Webserv
 
 Pods/Service zeigen, dann Endpoint-Liste, `cilium-dbg bpf lb list` und `cilium-dbg bpf policy get --all`. Service-IP mit den beiden Backend-Adressen vergleichen; Labels und Identitäten mit den Policy-Einträgen verbinden. Die Policy-Map zeigt auch den Proxy-Port für die L7-Umleitung.
 
+### E — Eigener XDP-Portfilter mit Python und Maps
+
+`lab:setup` baut zusätzlich `lab/xdp/Dockerfile`. Bei bereits laufendem Cilium-Labor genügt `npm run lab:xdp:setup`; dabei wird ausschließlich der mit `org.ebpf-talk.lab=xdp` markierte Container `ebpf-talk-xdp` neu erstellt.
+
+Im Container verbinden zwei isolierte Netzwerk-Namespaces ein veth-Paar: `talk-client` (192.0.2.1) → `talk-server` (192.0.2.2). Auf dem Server laufen HTTP-Dienste auf 8080 und 9090. Unser Filter hängt im **Generic/SKB-Modus** am Server-Eingang `eth0`. Eigenes bpffs ohne Host-Bind-Mount; keine veröffentlichten Ports oder Host-Netzwerkverbindung. Docker-Privilegien werden für Netzwerk-Namespaces und BPF benötigt. Der Linux-Kernel stammt weiterhin aus der Docker-VM.
+
+1. Regel aufheben, beide Ports testen: jeweils HTTP 200.
+2. `control.py` Zeilen 12–15: `write("blocked_port", 0, 9090)` ändert die echte ARRAY-Map, ohne das Programm neu zu laden.
+3. 9090 testen: Timeout und steigender DROP-Zähler.
+4. 8080 als Kontrolle: HTTP 200 und steigender PASS-Zähler.
+5. Regel aufheben (`blocked_port[0] = 0`), 9090 erneut testen: HTTP 200.
+6. Programm-ID vergleichen: Sie bleibt über die Map-Änderungen gleich. `maps.py` zeigt die konkreten `bpftool map lookup/update`-Aufrufe.
+
+Die Zähler erfassen ausschließlich parsebare, nicht fragmentierte IPv4-TCP-Pakete am Server-Eingang. ARP, IPv6, VLAN und Fragmente passieren ohne Zählung. Dies ist ein gezielt begrenzter Lehrfilter, kein universeller Firewall-Ersatz. Wiederholte SYN-Pakete können mehrere Drops pro HTTP-Test erzeugen. Generic XDP belegt die Funktion; der Versuch behauptet keine native-XDP-Performance. XDP-Drops erzeugen hier keine Hubble-Events, weil dies kein Cilium-Programm ist.
+
+Der Kernel-Quelltext `filter.bpf.c` ist als GPL-2.0-only gekennzeichnet und wird mit Clang/BTF vorab kompiliert. Im Vortrag werden Python, Map-Werte und echte Ergebnisse gezeigt, kein C-Walkthrough. Offizielle Werkzeugreferenzen: [bpftool prog](https://github.com/libbpf/bpftool/blob/main/docs/bpftool-prog.rst), [bpftool map](https://github.com/libbpf/bpftool/blob/main/docs/bpftool-map.rst).
+
 ## Messprotokolle und Grenzen
 
 Jeder Befehl erzeugt `lab/evidence/<UUID>.json` mit Zeitstempeln, Exitcode, stdout/stderr, Ressourcen, Backend-Logs sowie originalem Hubble-JSON. Diese lokalen Protokolle werden nicht ins öffentliche Repository gepusht. Hubble wird auf `ebpf-talk/client*` und den Beginn des jeweiligen Befehls gefiltert. Bis zu 80 Ereignisse werden erfasst; Drops und HTTP-Ereignisse stehen in der Darstellung zuerst. Die Erfassung ist eine begrenzte Momentaufnahme, kein vollständiger Paketmitschnitt. BPF-Map-Lesebefehle erzeugen üblicherweise selbst keine Client-Flows.
 
 Die Hubble UI ist die echte Anwendung, kein Nachbau. Beide Präsentationsfenster zeigen denselben Verkehr, aber Hubble-interne Auswahl und Zoom sind unabhängig. Die integrierte Flow-Auswahl wird dagegen vollständig synchronisiert.
 
-Die Website kann auf macOS keine eBPF-Programme im macOS-Kernel ausführen. Diese Ausführung erfolgt im Linux-Kernel der Docker-VM. Der Vortrag enthält keinen eigenen XDP-Portfilter mehr; er zeigt eine echte Cilium-Netzwerkregel und ihren BPF-Zustand.
+Die Website kann auf macOS keine eBPF-Programme im macOS-Kernel ausführen. Diese Ausführung erfolgt im Linux-Kernel der Docker-VM. Cilium-Netzwerkregel und eigener XDP-Portfilter sind separate Versuche. Die BPF-Map-Inspektion bleibt erhalten.
 
 ## Prüfen und beenden
 
 ```sh
 npm run lab:verify
+npm run lab:xdp:verify
+# Zusätzliche Paket-Fixtures im Kernel (ändert Zähler, setzt Regel danach zurück):
+docker exec ebpf-talk-xdp python3 /opt/xdp/test_packets.py
 ```
 
 Der Test setzt die offene Policy auch nach einem fehlgeschlagenen Assertion-Versuch zurück. Anschließend `Ctrl+C` im Brückenterminal beendet die Portweiterleitungen. Nur das eigene Labor stoppen:
 
 ```sh
+docker stop ebpf-talk-xdp
 k3d cluster stop ebpf-talk
 # Später wieder:
+docker start ebpf-talk-xdp
 k3d cluster start ebpf-talk
 npm run lab
 ```

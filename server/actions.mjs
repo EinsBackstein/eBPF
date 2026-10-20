@@ -22,7 +22,18 @@ const agent = (...args) => [
   "cilium-dbg",
   ...args,
 ];
+const xdp = (command, label) => ({
+  label,
+  binary: "docker",
+  experiment: "xdp",
+  args: ["exec", "ebpf-talk-xdp", "python3", "/opt/xdp/control.py", command],
+});
 export const actions = Object.freeze({
+  "xdp-status": xdp("status", "Maps lesen"),
+  "xdp-block": xdp("block", "9090 sperren"),
+  "xdp-clear": xdp("clear", "Regel aufheben"),
+  "xdp-8080": xdp("test8080", "8080 testen"),
+  "xdp-9090": xdp("test9090", "9090 testen"),
   "request-a": {
     label: "Client A · eine Anfrage",
     args: execClient("client-a", "new", 1),
@@ -78,7 +89,9 @@ export const actions = Object.freeze({
 });
 export function publicCommand(id) {
   const action = Object.hasOwn(actions, id) ? actions[id] : null;
-  return action ? "kubectl " + action.args.join(" ") : null;
+  return action
+    ? (action.binary || "kubectl") + " " + action.args.join(" ")
+    : null;
 }
 export function summarizeFlows(raw) {
   return raw

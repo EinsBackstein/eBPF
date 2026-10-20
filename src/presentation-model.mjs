@@ -21,9 +21,16 @@ export function readPresentation(value, count) {
     )
       ? lab.view
       : "split",
-    source: ["server", "client", "open", "trusted", "workloads"].includes(
-      lab.source,
-    )
+    source: [
+      "server",
+      "client",
+      "open",
+      "trusted",
+      "workloads",
+      "xdpControl",
+      "xdpMaps",
+      "xdpRequest",
+    ].includes(lab.source)
       ? lab.source
       : "server",
     page: Number.isInteger(lab.page) ? Math.max(0, Math.min(20, lab.page)) : 0,

@@ -10,7 +10,9 @@
     "test": "node --test tests/*.test.mjs",
     "lab:setup": "bash lab/scripts/setup.sh",
     "lab": "node server/lab.mjs",
-    "lab:verify": "node lab/scripts/verify.mjs"
+    "lab:verify": "node lab/scripts/verify.mjs",
+    "lab:xdp:setup": "bash lab/scripts/setup-xdp.sh",
+    "lab:xdp:verify": "node lab/scripts/verify-xdp.mjs"
   },
   "dependencies": {
     "@fontsource-variable/inter": "^5.2.0",

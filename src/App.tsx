@@ -31,7 +31,34 @@ type Snapshot = {
   lab: LabState;
   answers: number[];
 };
-const KEY = "ebpf-deck-v3";
+const KEY = "ebpf-deck-v4";
+// Slide 13 is new. Preserve the previous deck position and locally edited notes.
+try {
+  if (!localStorage.getItem(KEY) && localStorage.getItem("ebpf-deck-v3")) {
+    try {
+      const old = JSON.parse(localStorage.getItem("ebpf-deck-v3")!);
+      if (old.index >= 12) old.index += 1;
+      localStorage.setItem(KEY, JSON.stringify(old));
+    } catch {
+      /* Ignore corrupt old state. */
+    }
+  }
+  if (!localStorage.getItem("ebpf-notes-xdp-migrated")) {
+    try {
+      const notes = JSON.parse(localStorage.getItem("ebpf-notes") || "{}");
+      for (const i of [14, 13, 12]) {
+        if (typeof notes[i] === "string") notes[i + 1] = notes[i];
+        delete notes[i];
+      }
+      localStorage.setItem("ebpf-notes", JSON.stringify(notes));
+      localStorage.setItem("ebpf-notes-xdp-migrated", "true");
+    } catch {
+      /* Storage may be unavailable. */
+    }
+  }
+} catch {
+  /* Storage may be unavailable. */
+}
 const audience =
   new URLSearchParams(location.search).get("view") === "audience";
 function stored(): Snapshot {
@@ -207,10 +234,13 @@ export default function App() {
                   ? "client"
                   : index === 10
                     ? "trusted"
-                    : index === 11
-                      ? "workloads"
-                      : "server",
+                    : index === 12
+                      ? "xdpControl"
+                      : index === 11
+                        ? "workloads"
+                        : "server",
               page: index === 11 ? 3 : 1,
+              run: (s.index === 12) !== (index === 12) ? null : s.lab.run,
             }
           : s.lab,
     }));

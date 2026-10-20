@@ -1,6 +1,9 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { codeToHtml } from "shiki";
 const definitions = {
+  xdpControl: ["lab/xdp/control.py", "python"],
+  xdpMaps: ["lab/xdp/maps.py", "python"],
+  xdpRequest: ["lab/xdp/request.py", "python"],
   server: ["lab/app/server.py", "python"],
   client: ["lab/app/client.py", "python"],
   open: ["lab/manifests/policy-open.yaml", "yaml"],

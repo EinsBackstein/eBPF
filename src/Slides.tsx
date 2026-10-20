@@ -391,8 +391,8 @@ export function SlideContent({
                         "Endpoint-Identitäten und BPF-Policy-Map",
                       ],
                       [
-                        "Der Zugriff ist wiederhergestellt",
-                        "Offene Regel anwenden und Client B erneut testen",
+                        "Der XDP-Portfilter wirkt selektiv",
+                        "9090 Timeout + ΔDROP; 8080 HTTP 200 + ΔPASS; danach 9090 wieder HTTP 200",
                       ],
                     ].map((r) => (
                       <tr key={r[0]}>

@@ -952,6 +952,8 @@
   line-height: 34px;
 }
 
+.numbered-code[data-source="xdpControl"] .line[data-line="13"],
+.numbered-code[data-source="xdpControl"] .line[data-line="15"],
 .numbered-code[data-source="trusted"] .line[data-line="14"],
 .numbered-code[data-source="server"] .line[data-line="11"],
 .numbered-code[data-source="server"] .line[data-line="12"],
@@ -966,4 +968,43 @@
 }
 .lab-heading > div > span {
   padding: 2px 9px;
+}
+
+.xdp-output {
+  gap: 0 !important;
+}
+.xdp-output h2 {
+  font-size: 27px;
+  line-height: 34px;
+  margin: 12px 16px 4px;
+}
+.xdp-output h2 em {
+  font-style: normal;
+  color: var(--nb-primary);
+}
+.xdp-output p {
+  font-size: 20px;
+  line-height: 27px;
+  margin: 0 16px 8px;
+}
+.xdp-output .response-table {
+  margin: 8px 0;
+}
+.xdp-output .response-table th,
+.xdp-output .response-table td {
+  font-size: 22px;
+  padding: 7px 16px;
+}
+.xdp-request {
+  border-bottom: 1px solid var(--nb-border);
+  padding-bottom: 8px;
+}
+.xdp-request p {
+  font-family: var(--mono);
+  font-size: 14px;
+  line-height: 22px;
+}
+.xdp-output .xdp-hook {
+  font-size: 18px;
+  margin-top: 8px;
 }

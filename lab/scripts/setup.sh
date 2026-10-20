@@ -36,4 +36,5 @@ kubectl rollout status deployment/web -n ebpf-talk --timeout=180s
 kubectl wait --for=condition=Ready pod/client-a pod/client-b -n ebpf-talk --timeout=180s
 kubectl apply -f lab/manifests/policy-open.yaml
 bash lab/scripts/install-hubble.sh
+bash lab/scripts/setup-xdp.sh
 echo 'Lab ready. Start the bridge with: npm run lab'

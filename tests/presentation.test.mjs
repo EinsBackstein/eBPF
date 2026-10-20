@@ -11,13 +11,13 @@ test("audience state preserves real evidence while rejecting invalid slide navig
     lab: initialLab(),
     answers: [1, 1, 99],
   };
-  assert.deepEqual(readPresentation(value, 15), { ...value, answers: [1] });
-  assert.equal(readPresentation({ ...value, index: -1 }, 15), null);
-  assert.equal(readPresentation({ ...value, index: 15 }, 15), null);
-  assert.equal(readPresentation({ ...value, black: "false" }, 15), null);
+  assert.deepEqual(readPresentation(value, 16), { ...value, answers: [1] });
+  assert.equal(readPresentation({ ...value, index: -1 }, 16), null);
+  assert.equal(readPresentation({ ...value, index: 16 }, 16), null);
+  assert.equal(readPresentation({ ...value, black: "false" }, 16), null);
   const safe = readPresentation(
     { ...value, lab: { view: "arbitrary", source: "../../secrets", page: -3 } },
-    15,
+    16,
   );
   assert.equal(safe.lab.view, "split");
   assert.equal(safe.lab.source, "server");
@@ -48,7 +48,20 @@ test("available actions are fixed argument arrays confined to the presentation n
   for (const [id, a] of Object.entries(actions)) {
     assert.ok(Array.isArray(a.args));
     assert.equal(typeof publicCommand(id), "string");
-    if (a.args[0] === "apply")
+    if (a.binary === "docker") {
+      assert.equal(a.experiment, "xdp");
+      assert.deepEqual(a.args.slice(0, 4), [
+        "exec",
+        "ebpf-talk-xdp",
+        "python3",
+        "/opt/xdp/control.py",
+      ]);
+      assert.ok(
+        ["status", "block", "clear", "test8080", "test9090"].includes(
+          a.args[4],
+        ),
+      );
+    } else if (a.args[0] === "apply")
       assert.match(a.args[2], /^lab\/manifests\/policy-(open|trusted)\.yaml$/);
     else
       assert.ok(a.args.includes("ebpf-talk") || a.args.includes("cilium-dbg"));
@@ -68,4 +81,31 @@ test("displayed source is generated from the executable lab files", async () => 
       f.raw,
       await readFile(new URL("../" + f.path, import.meta.url), "utf8"),
     );
+});
+
+test("audience round trip preserves XDP code selection and measured map deltas", () => {
+  const run = {
+    id: "measurement",
+    experiment: "xdp",
+    stdout: "{}",
+    flows: { events: [] },
+    xdp: {
+      blocked_port: 9090,
+      before: { PASS: 10, DROP: 0 },
+      after: { PASS: 10, DROP: 2 },
+      delta: { PASS: 0, DROP: 2 },
+      request: { port: 9090, error: "TimeoutError" },
+      program: { id: 123 },
+    },
+  };
+  const state = {
+    index: 12,
+    black: false,
+    lab: { ...initialLab(), source: "xdpMaps", page: 1, run },
+    answers: [],
+  };
+  assert.deepEqual(
+    readPresentation(JSON.parse(JSON.stringify(state)), 16),
+    state,
+  );
 });

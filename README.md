@@ -1,6 +1,6 @@
 # eBPF im Linux-Netzwerk
 
-Eine Präsentationswebsite mit festem 16:9-Format, großen Referentennotizen und synchronisierter Zuschaueransicht. React, TypeScript und Vite. Der Praxisteil verbindet echte Python-/YAML-Dateien mit einem lokalen **k3d + Cilium + Hubble**-Labor.
+Eine Präsentationswebsite mit festem 16:9-Format, großen Referentennotizen und synchronisierter Zuschaueransicht. React, TypeScript und Vite. Der Praxisteil verbindet echte Python-/YAML-Dateien mit einem lokalen **k3d + Cilium + Hubble**-Labor sowie einem eigenen XDP-Portfilter.
 
 ## Start
 
@@ -56,10 +56,11 @@ Folien, Code-Datei/-Seite, ausgewählte Ansicht, Messergebnis, Flow-Auswahl und 
 - **B · Verteilen:** fünf HTTP-Anfragen über eine Verbindung mit zehn neu aufgebauten Verbindungen vergleichen. Backend-Namen sind gemessen; es gibt keine festgelegte Verteilungsfolge.
 - **C · Netzwerkregel:** offene Policy → B erfolgreich → `role: trusted` ergänzen → B Timeout / Hubble `POLICY_DENIED` → A erfolgreich → offene Policy → B wieder erfolgreich.
 - **D · Kernelzustand:** echte Pod-/Service-Adressen, Endpoint-Identitäten, BPF-LB-Map und BPF-Policy-Maps vergleichen.
+- **E · Eigener XDP-Filter:** Python setzt `blocked_port[0] = 9090`; 9090 läuft in einen Timeout, 8080 antwortet weiterhin. PASS/DROP werden direkt aus BPF-Maps gelesen. Regel aufheben und Zugriff erneut belegen.
 
 **Code groß** zeigt den Quelltext für das Publikum vergrößert. Die Dateiansicht ist paginiert; Zeilennummern beziehen sich auf die vollständige Datei. **Code + Ergebnis**, **Originalausgabe**, **Hubble UI**, **Flowdetails** und **Backend-Logs** stellen unterschiedliche Nachweise dar. Die Messungsauswahl erlaubt den Vergleich vorheriger Befehle innerhalb der Sitzung. Vollständige Protokolle liegen lokal unter `lab/evidence/` (Git-ignoriert).
 
-Der separate animierte XDP-Versuch wurde entfernt. XDP wird fachlich erklärt; die ausführbare Filterdemonstration verwendet Cilium-Policy im TC-Datenpfad.
+Der XDP-Versuch läuft in einem separaten, netzwerkisolierten Docker-Container mit zwei Netzwerk-Namespaces und veth. Generic/SKB-XDP ist an dessen Server-Interface angebunden; Ciliums Datenpfad bleibt unabhängig. Diese Drops erscheinen nicht in Hubble. Der Container benötigt Privilegien zum Laden des BPF-Programms in der Linux-VM, hat aber keine Host-Netzwerkverbindung, Bind-Mounts oder veröffentlichten Ports. Der C-Quelltext wird vorab gebaut; im Vortrag wird Python gezeigt.
 
 ## Gestaltung und Originalgrafiken
 
@@ -72,8 +73,9 @@ npm test
 npm run build
 # Bei laufendem Labor und laufender Brücke:
 npm run lab:verify
+npm run lab:xdp:verify
 ```
 
 Der Live-Test prüft Ausgangszustand, Request-ID-Korrelation, Keep-alive, neue Verbindungen, Policy-Drop, erlaubte Kontrolle, BPF-Maps und Wiederherstellung. Er setzt abschließend die offene Policy. Die Pipeline führt die lokalen Tests und den Build aus; ein Docker-Labor ist nicht Teil des GitHub-CI-Jobs.
 
-15 Folien, Richtzeit insgesamt 23:30 einschließlich Diskussion. Unter **Folien → Handout herunterladen** entsteht ein Markdown-Handout mit Folienpunkten, Standardsprechtexten, drei Fragen/Antworten und Quellen. Individuell bearbeitete Notizen werden nicht exportiert. Die ursprünglichen Vorgaben und die frühere Planung bleiben unter `docs/` als Projektunterlagen erhalten.
+16 Folien, Richtzeit insgesamt 25:00 einschließlich Diskussion. Unter **Folien → Handout herunterladen** entsteht ein Markdown-Handout mit Folienpunkten, Standardsprechtexten, drei Fragen/Antworten und Quellen. Individuell bearbeitete Notizen werden nicht exportiert. Die ursprünglichen Vorgaben und die frühere Planung bleiben unter `docs/` als Projektunterlagen erhalten.

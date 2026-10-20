@@ -7,6 +7,7 @@ import {
   Terminal,
 } from "lucide-react";
 import files from "./code.generated.json";
+import { XdpOutput, type XdpEvidence } from "./Xdp";
 
 type Source = keyof typeof files;
 type Flow = {
@@ -27,6 +28,8 @@ type Flow = {
   };
 };
 export type LabRun = {
+  experiment?: "xdp";
+  xdp?: XdpEvidence | null;
   id: string;
   action: string;
   at: string;
@@ -57,10 +60,34 @@ export type LabState = {
   flowIndex: number;
   run: LabRun | null;
 };
+const views = [
+  ["split", "Code + Ergebnis"],
+  ["source", "Code"],
+  ["hubble", "Hubble UI"],
+  ["flows", "Flowdetails"],
+  ["logs", "Backend-Logs"],
+  ["terminal", "Originalausgabe"],
+];
 export const lessons: Record<
   number,
   { heading: string; why: string; read: string; actions: [string, string][] }
 > = {
+  12: {
+    heading: "Python ändert die Map; XDP entscheidet über Pakete",
+    why: "Python ändert nur die Map. XDP verwirft TCP-Pakete an 9090; 8080 bleibt erreichbar. Wiederholte SYNs erklären mehrere Drops pro Test. Separates veth-Testnetz: keine Hubble-Ereignisse.",
+    read: "control.py · Zeilen 12–15: Regel-Map schreiben. Zeilen 25–31: Zähler vorher / nachher lesen.",
+    actions: [
+      ["xdp-clear", "1 · Regel aufheben"],
+      ["xdp-8080", "2 · 8080 testen"],
+      ["xdp-9090", "3 · 9090 testen"],
+      ["xdp-block", "4 · 9090 sperren"],
+      ["xdp-9090", "5 · 9090 erneut testen"],
+      ["xdp-8080", "6 · 8080 als Kontrolle"],
+      ["xdp-clear", "7 · Regel aufheben"],
+      ["xdp-9090", "8 · 9090 wieder testen"],
+      ["xdp-status", "Maps lesen"],
+    ],
+  },
   8: {
     heading: "Eine Anfrage bis zum antwortenden Pod verfolgen",
     why: "Der Server schreibt Podname, Request-ID und seine TCP-Gegenstelle in die Antwort. Diese Werte verbinden Clientausgabe und Backend-Log. Hubble zeigt zusätzlich, welche Endpoints kommunizieren.",
@@ -219,10 +246,29 @@ function Output({ run }: { run: LabRun | null }) {
 }
 export function LabSlide({ index, state }: { index: number; state: LabState }) {
   const lesson = lessons[index],
-    run = state.run;
+    run =
+      state.run?.experiment === "xdp"
+        ? index === 12
+          ? state.run
+          : null
+        : index === 12
+          ? null
+          : state.run;
   const flows = run?.flows.events || [],
     flow = flows[Math.min(state.flowIndex, flows.length - 1)];
   let explanation = lesson.why;
+  if (index === 12 && run?.xdp) {
+    const e = run.xdp;
+    if (!e.request)
+      explanation = `Regel-Map dieser Messung: ${e.blocked_port === 0 ? "0 = deaktiviert" : "TCP/" + e.blocked_port + " sperren"}. Programm #${e.program.id} bleibt angebunden. Jetzt die Wirkung mit echten Anfragen prüfen; die Map-Änderung allein erzeugt keinen Paket-Test.`;
+    else if (e.request.error)
+      explanation =
+        e.delta.DROP > 0
+          ? `TCP/${e.request.port}: ${e.request.error}. Die Regel-Map enthält ${e.blocked_port}; der Filter hat ${e.delta.DROP} Paket(e) verworfen. Wiederholte SYNs erklären mehrere Drops. Jetzt 8080 als Kontrolle testen. Keine Hubble-Ereignisse in diesem separaten Testnetz.`
+          : `TCP/${e.request.port}: ${e.request.error}, aber kein gemessener DROP. Diese Messung belegt keine XDP-Sperre. Originalausgabe prüfen und erlaubten Kontrollport testen.`;
+    else
+      explanation = `TCP/${e.request.port}: HTTP ${e.request.status}, ΔPASS = ${e.delta.PASS}, ΔDROP = ${e.delta.DROP}. ${e.blocked_port === 0 ? "Die Regel ist deaktiviert." : "Der Zielport passt nicht zur Sperre auf " + e.blocked_port + "."} Gezählt werden IPv4-TCP-Pakete am Server-Eingang, keine HTTP-Anfragen.`;
+  }
   if (index === 10 && run?.resources) {
     const policy = run.resources.items.find(
       (r) =>
@@ -267,20 +313,22 @@ export function LabSlide({ index, state }: { index: number; state: LabState }) {
   return (
     <div className={`lab-workspace view-${state.view}`}>
       <div className="lab-heading">
-        <span>k3d-ebpf-talk / ebpf-talk</span>
+        <span>
+          {index === 12
+            ? "ebpf-talk-xdp / separates veth-Testnetz"
+            : "k3d-ebpf-talk / ebpf-talk"}
+        </span>
         <div>
-          {[
-            ["split", "Code + Ergebnis"],
-            ["source", "Code"],
-            ["hubble", "Hubble UI"],
-            ["flows", "Flowdetails"],
-            ["logs", "Backend-Logs"],
-            ["terminal", "Originalausgabe"],
-          ].map(([v, l]) => (
-            <span key={v} className={state.view === v ? "active" : ""}>
-              {l}
-            </span>
-          ))}
+          {views
+            .filter(
+              ([v]) =>
+                index !== 12 || ["split", "source", "terminal"].includes(v),
+            )
+            .map(([v, l]) => (
+              <span key={v} className={state.view === v ? "active" : ""}>
+                {l}
+              </span>
+            ))}
         </div>
       </div>
       {state.view === "split" && (
@@ -289,7 +337,11 @@ export function LabSlide({ index, state }: { index: number; state: LabState }) {
             <CodeBlock source={state.source} page={state.page} />
             <p className="code-reading">{lesson.read}</p>
           </div>
-          <Output run={run} />
+          {index === 12 ? (
+            <XdpOutput evidence={run?.xdp} stderr={run?.stderr} at={run?.at} />
+          ) : (
+            <Output run={run} />
+          )}
         </div>
       )}
       {state.view === "source" && (
@@ -443,9 +495,16 @@ export function LabControls({
           if (!r.ok) throw new Error();
           const v = await r.json();
           if (live) {
-            setReady(v.ready);
+            const connected = index === 12 ? v.xdpReady : v.ready;
+            setReady(connected);
             setStatus(
-              v.ready ? "Linux-Labor verbunden" : "Lab-Pods noch nicht bereit",
+              connected
+                ? index === 12
+                  ? "XDP-Labor verbunden"
+                  : "Linux-Labor verbunden"
+                : index === 12
+                  ? "XDP fehlt · npm run lab:xdp:setup"
+                  : "Lab-Pods noch nicht bereit",
             );
           }
         })
@@ -461,7 +520,7 @@ export function LabControls({
       live = false;
       clearInterval(timer);
     };
-  }, []);
+  }, [index]);
   async function execute(action: string) {
     setBusy(true);
     try {
@@ -509,9 +568,13 @@ export function LabControls({
             <option value="split">Code + Ergebnis</option>
             <option value="source">Code groß</option>
             <option value="terminal">Originalausgabe</option>
-            <option value="hubble">Hubble UI (live)</option>
-            <option value="flows">Flowdetails</option>
-            <option value="logs">Backend-Logs</option>
+            {index !== 12 && (
+              <>
+                <option value="hubble">Hubble UI (live)</option>
+                <option value="flows">Flowdetails</option>
+                <option value="logs">Backend-Logs</option>
+              </>
+            )}
           </select>
         </label>
       </div>
@@ -525,11 +588,13 @@ export function LabControls({
               onChange({ source: e.target.value as Source, page: 0 })
             }
           >
-            {Object.entries(files).map(([id, f]) => (
-              <option key={id} value={id}>
-                {f.path.split("/").pop()}
-              </option>
-            ))}
+            {Object.entries(files)
+              .filter(([id]) => id.startsWith("xdp") === (index === 12))
+              .map(([id, f]) => (
+                <option key={id} value={id}>
+                  {f.path.split("/").pop()}
+                </option>
+              ))}
           </select>
         </label>
         <button
@@ -566,7 +631,7 @@ export function LabControls({
           </label>
         )}
       </div>
-      {history.length > 0 && (
+      {history.some((r) => (r.experiment === "xdp") === (index === 12)) && (
         <div className="lab-controls-row">
           <label>
             Messung{" "}
@@ -578,12 +643,14 @@ export function LabControls({
                 if (run) onChange({ run, flowIndex: 0 });
               }}
             >
-              {history.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {new Date(r.at).toLocaleTimeString("de-AT")} · {r.action} ·
-                  Exit {r.code}
-                </option>
-              ))}
+              {history
+                .filter((r) => (r.experiment === "xdp") === (index === 12))
+                .map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {new Date(r.at).toLocaleTimeString("de-AT")} · {r.action} ·
+                    Exit {r.code}
+                  </option>
+                ))}
             </select>
           </label>
         </div>

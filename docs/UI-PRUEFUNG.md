@@ -15,3 +15,8 @@ Geprüft über den echten lokalen Browser unter `http://127.0.0.1:5173/`, mit ei
 Lokale Belegbilder liegen unter `.lab/screenshots/` (Git-ignoriert): `hubble-live.jpg`, `policy-code-result.jpg`, `policy-flow-proof.jpg`, `macbook-notes.jpg`.
 
 Build, Modell-/Parserprüfungen und tatsächliche Laborprüfungen werden getrennt dokumentiert. Das ausführbare Live-Testskript und dessen letzte verifizierte Ergebnisse stehen in [LAB-VERIFICATION.md](LAB-VERIFICATION.md).
+
+
+## Ergänzung — 20. Oktober 2026
+
+Die neue XDP-Folie (jetzt 16 Folien) und ihre drei zusätzlichen Python-Dateien sind gebaut; Quelltextgleichheit und Erhalt der Map-Messwerte in der serialisierten Zuschaueransicht sind automatisiert geprüft. Eine erneute visuelle Browserprüfung war in dieser Sitzung durch die Browser-URL-Sicherheitsrichtlinie blockiert. Die obigen Überlauf- und Screenshot-Befunde gelten für den Stand vom 17. Oktober, nicht als Beleg für die neue Folie. Die echte XDP-Ausführung ist separat in LAB-VERIFICATION.md dokumentiert.

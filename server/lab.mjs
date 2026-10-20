@@ -113,7 +113,13 @@ const server = http.createServer(async (req, res) => {
         5000,
       );
       const pods = result.code === 0 ? JSON.parse(result.stdout).items : [];
+      const xdp = await run(
+        "docker",
+        ["exec", "ebpf-talk-xdp", "test", "-f", "/run/xdp-ready"],
+        4000,
+      );
       return send(res, 200, {
+        xdpReady: xdp.code === 0,
         ready:
           pods.length >= 4 &&
           forwards.size === 2 &&
@@ -146,9 +152,39 @@ const server = http.createServer(async (req, res) => {
         return send(res, 409, { error: "A lab command is already running" });
       busy = true;
       try {
-        await checkContext();
+        if (actions[action].experiment !== "xdp") await checkContext();
         const startedAt = new Date().toISOString();
-        const result = await run("kubectl", actions[action].args);
+        const result = await run(
+          actions[action].binary || "kubectl",
+          actions[action].args,
+        );
+        if (actions[action].experiment === "xdp") {
+          let xdp = null;
+          try {
+            xdp = JSON.parse(result.stdout);
+          } catch {
+            /* Preserve failure output. */
+          }
+          const record = {
+            id: crypto.randomUUID(),
+            action,
+            experiment: "xdp",
+            command: publicCommand(action),
+            startedAt,
+            at: new Date().toISOString(),
+            ...result,
+            xdp,
+            resources: null,
+            logs: { stdout: "", stderr: "" },
+            flows: { events: [], code: null, command: "", stderr: "" },
+          };
+          await mkdir(path.join(root, "lab/evidence"), { recursive: true });
+          await writeFile(
+            path.join(root, "lab/evidence", record.id + ".json"),
+            JSON.stringify(record, null, 2),
+          );
+          return send(res, 200, record);
+        }
         // Read current pod labels / policy and backend logs alongside the command result.
         const resources = await run(
           "kubectl",
