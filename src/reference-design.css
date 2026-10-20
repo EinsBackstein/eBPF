@@ -1008,3 +1008,132 @@
   font-size: 18px;
   margin-top: 8px;
 }
+
+/* One consistent foundation layout; the orange rule follows the current topic. */
+.fundamentals {
+  flex: 1;
+}
+.fundamentals .docs-toc {
+  padding-top: 5px;
+}
+.fundamentals .docs-prose {
+  font-size: 28px;
+  line-height: 1.65;
+}
+.fundamentals .docs-prose h2 {
+  margin-top: 28px;
+}
+.hook-list {
+  margin-top: 30px;
+}
+.hook-list > div {
+  display: grid;
+  grid-template-columns: 225px 1fr;
+  gap: 24px;
+  padding: 16px 0;
+  border-top: 1px solid var(--nb-border);
+}
+.hook-list dt {
+  font-weight: 600;
+}
+.hook-list dd {
+  margin: 0;
+}
+.simple-flow {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr auto 1fr;
+  gap: 20px;
+  align-items: center;
+  margin-top: 38px;
+}
+.simple-flow > span {
+  text-align: center;
+  padding: 22px 12px;
+  border: 1px solid var(--nb-border);
+  border-radius: 6px;
+  font-size: 25px;
+  line-height: 1.45;
+  background: var(--nb-card);
+}
+.simple-flow > .focus {
+  border-color: var(--nb-primary);
+  background: oklch(0.97 0.02 70);
+}
+.simple-flow small {
+  color: var(--nb-muted-foreground);
+  font-size: 21px;
+}
+.fundamentals .fundamental-caption {
+  margin-top: 24px;
+  font-size: 24px;
+  line-height: 1.5;
+  color: var(--nb-muted-foreground);
+}
+.organisation-grid {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+  gap: 24px;
+  padding: 0;
+  margin: 10px 0 20px;
+  flex: 1;
+  min-height: 0;
+}
+.organisation-grid > li {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  border: 1px solid #e6e6e6;
+  border-radius: 8px;
+  background: white;
+  padding: 32px;
+  min-height: 0;
+}
+.organisation-grid img {
+  height: 48px;
+  width: auto;
+  max-width: 250px;
+  object-fit: contain;
+  object-position: left center;
+}
+.organisation-grid p {
+  font-size: 25px;
+  line-height: 1.5;
+  margin: 24px 0;
+}
+.organisation-grid a {
+  border-top: 1px dashed #e6e6e6;
+  padding-top: 18px;
+  margin-top: auto;
+  width: 100%;
+  text-transform: uppercase;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: #191919;
+}
+.cf-code {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+.cf-code-title {
+  flex-shrink: 0;
+}
+.numbered-code {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  counter-reset: line;
+}
+.code-large .numbered-code {
+  max-height: none;
+}
+.numbered-code:focus-visible {
+  outline: 2px solid var(--nb-primary);
+  outline-offset: -2px;
+}

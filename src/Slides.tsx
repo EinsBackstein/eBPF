@@ -2,22 +2,19 @@ import { slides, sources, questions } from "./deck";
 import { LabSlide, type LabState } from "./Lab";
 import { KernelIllustration } from "./Illustrations";
 
-function Figure({ file, caption }: { file: string; caption: string }) {
-  return (
-    <figure className="original-figure">
-      <img src={`./vendor/cilium/${file}`} alt={caption} />
-      <figcaption>{caption} · Cilium Authors · Originalgrafik</figcaption>
-    </figure>
-  );
-}
+import { Fundamentals } from "./Fundamentals";
+import { Organisations } from "./Organisations";
+
 export function SlideContent({
   index,
   lab,
   answers,
+  onLabChange,
 }: {
   index: number;
   lab: LabState;
   answers: number[];
+  onLabChange?: (patch: Partial<LabState>) => void;
 }) {
   const s = slides[index];
   const cilium = s.kind === "title" || s.kind === "topology";
@@ -46,22 +43,6 @@ export function SlideContent({
                 Programme im Kernel ausführen. Verbindungen mit Cilium
                 verteilen. Mit Hubble sehen, was tatsächlich passiert.
               </p>
-              <div className="cilium-hero-links">
-                <a
-                  href="https://ebpf.io/what-is-ebpf/"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Grundlagen verstehen
-                </a>
-                <a
-                  href="http://127.0.0.1:12000/?namespace=ebpf-talk"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Linux-Labor öffnen
-                </a>
-              </div>
             </div>
             <KernelIllustration />
           </div>
@@ -71,9 +52,6 @@ export function SlideContent({
             </span>
             <span>
               02 <strong>Cilium</strong> Service & Policy
-            </span>
-            <span>
-              03 <strong>Hubble</strong> Flows & Ursachen
             </span>
           </div>
         </>
@@ -117,252 +95,15 @@ export function SlideContent({
               eBPF <span>/</span> {s.section} <span>/</span> {s.short}
             </div>
             <h1>{s.title}</h1>
-            <div className="cf-page-meta">
-              Linux-Netzwerke <span>│</span>{" "}
-              {s.kind === "lab"
-                ? "Ausführbarer Laborversuch"
-                : "Technische Grundlagen"}{" "}
-              <span>│</span> {s.time}
-            </div>
           </header>
           <div className="slide-body">
-            {s.kind === "definition" && (
-              <div className="docs-columns">
-                <div className="docs-prose">
-                  <p>
-                    eBPF-Programme erweitern den Linux-Kernel an definierten
-                    Hooks. Der Kernel prüft den Bytecode vor der Ausführung.
-                  </p>
-                  <h2>Ereignis statt eigener Hauptschleife</h2>
-                  <p>
-                    Ein Paket trifft ein oder eine Verbindung wird aufgebaut:
-                    Der Hook ruft das passende Programm mit seinem Kontext auf.
-                  </p>
-                  <h2>Userspace bleibt Userspace</h2>
-                  <p>
-                    Python steuert unsere Anwendung. Cilium lädt die
-                    eBPF-Programme. Python selbst läuft hier nicht im Kernel.
-                  </p>
-                </div>
-                <aside className="docs-toc">
-                  <h2>Die Bausteine</h2>
-                  <p className="active">Hook</p>
-                  <p>Verifier</p>
-                  <p>JIT</p>
-                  <p>Maps</p>
-                  <img
-                    src="./vendor/cilium/hero-illustration.svg"
-                    alt="Cilium Architektur"
-                  />
-                </aside>
-              </div>
+            {["definition", "hooks", "verifier", "jit", "maps"].includes(
+              s.kind,
+            ) && <Fundamentals topic={s.kind} />}
+            {s.kind === "companies" && <Organisations />}
+            {s.kind === "lab" && (
+              <LabSlide index={index} state={lab} onChange={onLabChange} />
             )}
-            {s.kind === "lifecycle" && (
-              <div className="docs-prose">
-                <p>
-                  Das Laden und die spätere Ausführung sind zwei getrennte
-                  Vorgänge.
-                </p>
-                <div className="cf-steps">
-                  <section>
-                    <h2>1. Kompilieren und laden</h2>
-                    <p>Ein Loader übergibt eBPF-Bytecode an den Kernel.</p>
-                  </section>
-                  <section>
-                    <h2>2. Prüfen und übersetzen</h2>
-                    <p>
-                      Der Verifier prüft die Zulässigkeit. Der JIT erzeugt auf
-                      unterstützten Systemen Maschinencode.
-                    </p>
-                  </section>
-                  <section>
-                    <h2>3. An den Hook binden</h2>
-                    <p>
-                      Ab jetzt führt ein passendes Ereignis das Programm aus.
-                      Ein neues Paket benötigt kein erneutes Laden.
-                    </p>
-                  </section>
-                </div>
-                <div className="cf-note">
-                  <strong>Im Labor</strong>
-                  <p>
-                    Cilium übernimmt diese Schritte. Wir verändern die Regeln
-                    und beobachten den resultierenden Datenpfad.
-                  </p>
-                </div>
-              </div>
-            )}
-            {s.kind === "verifier" && (
-              <div className="docs-columns figure-columns">
-                <div className="docs-prose">
-                  <h2>Verifier</h2>
-                  <p>
-                    Prüft unter anderem Speicherzugriffe und den Programmablauf.
-                    Vor einem Headerzugriff müssen die Paketgrenzen nachgewiesen
-                    sein.
-                  </p>
-                  <h2>JIT</h2>
-                  <p>
-                    Übersetzt zulässigen Bytecode in Maschinencode für die
-                    jeweilige CPU.
-                  </p>
-                  <div className="cf-note">
-                    <strong>Eine falsche Regel bleibt möglich</strong>
-                    <p>
-                      Die Absicht „Client B sperren“ kennt der Verifier nicht.
-                      Ob die Regel fachlich passt, zeigt der Versuch.
-                    </p>
-                  </div>
-                </div>
-                <Figure
-                  file="bpf-jit.png"
-                  caption="BPF-Bytecode → JIT → Maschinencode"
-                />
-              </div>
-            )}
-            {s.kind === "maps" && (
-              <div className="docs-columns figure-columns">
-                <Figure
-                  file="bpf-map.png"
-                  caption="Maps verbinden Userspace und BPF-Programme"
-                />
-                <div className="docs-prose">
-                  <h2>Gemeinsame Datenstrukturen</h2>
-                  <p>
-                    Userspace und BPF-Programme lesen und schreiben Daten in
-                    Maps. Welche Zugriffe möglich sind, hängt vom Map-Typ ab.
-                  </p>
-                  <h2>Was wir nachher auslesen</h2>
-                  <ul>
-                    <li>Service-IP und zugehörige Backends</li>
-                    <li>Endpoint-Identitäten</li>
-                    <li>Policy-Einträge für erlaubte Quellen</li>
-                  </ul>
-                  <p>
-                    <code>cilium-dbg bpf lb list</code>
-                    <br />
-                    zeigt die tatsächliche Service-Konfiguration.
-                  </p>
-                </div>
-              </div>
-            )}
-            {s.kind === "hooks" && (
-              <>
-                <table className="docs-table">
-                  <thead>
-                    <tr>
-                      <th>Hook</th>
-                      <th>Wann / welcher Kontext?</th>
-                      <th>Typische Aufgabe</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {[
-                      [
-                        "XDP",
-                        "Eingehendes Paket im frühen Empfangspfad",
-                        "PASS / DROP, z. B. DDoS-Abwehr",
-                      ],
-                      [
-                        "TC",
-                        "Paket am Netzwerkinterface",
-                        "Weiterleitung und Netzwerkregeln",
-                      ],
-                      [
-                        "Socket-Hooks",
-                        "z. B. beim Verbindungsaufbau",
-                        "Service auf Backend umsetzen",
-                      ],
-                      [
-                        "Tracepoints",
-                        "Definierte Kernelereignisse",
-                        "Verbindungen und Zustände beobachten",
-                      ],
-                    ].map((r) => (
-                      <tr key={r[0]}>
-                        {r.map((v, i) =>
-                          i === 0 ? (
-                            <th key={i}>
-                              <code>{v}</code>
-                            </th>
-                          ) : (
-                            <td key={i}>{v}</td>
-                          ),
-                        )}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                <div className="cf-note">
-                  <strong>Den Einsatzpunkt benennen</strong>
-                  <p>
-                    Eine Cilium-Netzwerkregel ist nicht automatisch ein
-                    XDP-Filter. Unser Labor zeigt Ciliums Service- und
-                    Policy-Datenpfad.
-                  </p>
-                </div>
-              </>
-            )}
-            {s.kind === "companies" && (
-              <>
-                <p className="docs-intro">
-                  Vier dokumentierte Systeme, vier konkrete Netzwerkaufgaben.
-                </p>
-                <table className="docs-table">
-                  <thead>
-                    <tr>
-                      <th>Unternehmen</th>
-                      <th>System</th>
-                      <th>Einsatz</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {[
-                      [
-                        "Meta",
-                        "Katran",
-                        "Netzwerk-Lastverteilung mit eBPF/XDP",
-                        2,
-                      ],
-                      [
-                        "Netflix",
-                        "Flow Exporter",
-                        "TCP-Flows über Tracepoints erfassen",
-                        3,
-                      ],
-                      [
-                        "Microsoft Azure",
-                        "Azure CNI / Cilium",
-                        "Kubernetes-Datenpfad und Netzwerkrichtlinien",
-                        8,
-                      ],
-                      [
-                        "Cloudflare",
-                        "L4Drop",
-                        "Pakete zur DDoS-Abwehr verwerfen",
-                        7,
-                      ],
-                    ].map(([a, b, c, id]) => (
-                      <tr key={String(a)}>
-                        <th>{a}</th>
-                        <td>{b}</td>
-                        <td>
-                          {c}{" "}
-                          <a
-                            href={sources[Number(id)][1]}
-                            target="_blank"
-                            rel="noreferrer"
-                          >
-                            [{Number(id) + 1}] ↗
-                          </a>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </>
-            )}
-            {s.kind === "lab" && <LabSlide index={index} state={lab} />}
             {s.kind === "results" && (
               <>
                 <table className="docs-table">
@@ -434,8 +175,8 @@ export function SlideContent({
                   ))}
                 </ol>
                 <p className="asset-attribution">
-                  Grafiken: Cilium Authors. Gestaltung nach Cilium und
-                  Cloudflare Docs. Quellen und Lizenzen:{" "}
+                  Grafiken: Cilium Authors und eBPF.io authors. Gestaltung nach
+                  Cilium, Cloudflare Docs und ebpf.io. Quellen und Lizenzen:{" "}
                   <a
                     href="./vendor/ATTRIBUTION.md"
                     target="_blank"
@@ -450,11 +191,7 @@ export function SlideContent({
         </>
       )}
       <footer className="slide-footer">
-        <span>
-          {cilium
-            ? "Grafiken: Cilium Authors · cilium.io"
-            : "eBPF · Linux-Netzwerke"}
-        </span>
+        <span>eBPF · Linux-Netzwerke</span>
         <span>
           {s.sourceIds.map((i) => (
             <a key={i} href={sources[i][1]} target="_blank" rel="noreferrer">

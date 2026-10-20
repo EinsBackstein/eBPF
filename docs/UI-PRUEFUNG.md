@@ -20,3 +20,17 @@ Build, Modell-/Parserprüfungen und tatsächliche Laborprüfungen werden getrenn
 ## Ergänzung — 20. Oktober 2026
 
 Die neue XDP-Folie (jetzt 16 Folien) und ihre drei zusätzlichen Python-Dateien sind gebaut; Quelltextgleichheit und Erhalt der Map-Messwerte in der serialisierten Zuschaueransicht sind automatisiert geprüft. Eine erneute visuelle Browserprüfung war in dieser Sitzung durch die Browser-URL-Sicherheitsrichtlinie blockiert. Die obigen Überlauf- und Screenshot-Befunde gelten für den Stand vom 17. Oktober, nicht als Beleg für die neue Folie. Die echte XDP-Ausführung ist separat in LAB-VERIFICATION.md dokumentiert.
+
+## Browserkommentare umgesetzt — 20. Oktober 2026
+
+- Fünf Grundlagenfolien im gemeinsamen Layout: Definition, Hooks, Verifier, JIT, Maps. Die aktuelle Position ist rechts durch `aria-current=step` und den orangefarbenen Balken markiert. Verifier, JIT und Maps verwenden einfache HTML-/CSS-Abläufe statt der umfangreichen Dokumentationsgrafiken.
+- Die Definition wurde in der Referentenansicht bei 1135 × 853 geprüft: kein Dokument- oder Folienkörperüberlauf. Die Seitenmarkierung war in beiden Fenstern korrekt. Verifier, JIT und Maps hatten in der Zuschaueransicht jeweils 0 px Folienkörperüberlauf. Die Hook-Folie hatte zunächst 3 px Überlauf; die vertikalen Zeilenabstände wurden anschließend reduziert.
+- Die sechs Original-Logos der ebpf.io-Produktionsübersicht laden vollständig. Das Kartenraster hatte 0 px Überlauf, ebenso jede einzelne Karte. Fachlicher Kontext steht in den Referentennotizen.
+- Die vollständige Python-/YAML-Datei ist scrollbar. Gemessener Codebereich: 348 px sichtbar, 1149 px Gesamthöhe. Nach einem Scrollbutton: Referenten- und Zuschauerfenster jeweils 160 px Scrollposition bei 801 px Scrollbereich.
+- Tastaturtest nach einem sauberen Neuladen: fokussierter Codebereich, Bild ab → Codeende; die Folie blieb unverändert. Zuschauerposition 285 px, Referentenposition 285,5 px (subpixelbedingte Rundung). Die große Codeansicht hatte keinen Dokument-/Folienkörperüberlauf.
+- Die Laboransicht enthält Code + Ergebnis, Code groß, Originalausgabe, Flowdetails und Backend-Logs. Hubble UI ist aus der Auswahl entfernt; alte gespeicherte Auswahl wird auf Flowdetails umgestellt.
+- Ein zusätzlicher statischer React-Render aller 16 Folien prüfte die entfernten Metazeilen, Titel-Links, Grafik-Fußzeile und Hubble-Agenda; genau fünf aktuelle Themenmarkierungen und sechs Logos; scrollbar markierte Codebereiche auf allen fünf Praxisfolien; Richtzeiten weiterhin insgesamt 25 Minuten. Build und sechs lokale Tests erfolgreich.
+
+Belegbilder lokal unter `.lab/screenshots/`: `foundation-0.jpg` (Hooks vor Abstandskorrektur), `foundation-2.jpg` (JIT), `foundation-3.jpg` (Maps), `organisations.jpg`, `code-scroll-presenter.jpg`. Diese Dateien bleiben Git-ignoriert.
+
+Der weitere vollständige Browserdurchlauf wurde durch einen Abbruch der Browserverbindung unterbrochen. Deshalb wird hier keine erneute vollständige Sichtprüfung aller 16 Folien und aller Code-Dateien behauptet. Die oben beschriebenen Einzelprüfungen wurden vorher erfolgreich durchgeführt.

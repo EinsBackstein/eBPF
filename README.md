@@ -38,7 +38,7 @@ Bei einer Videokonferenz das Zuschauerfenster in der Konferenzsoftware teilen. D
 
 Notizen sind standardmäßig 22 CSS-Pixel groß, mit A−/A+ von 18 bis 30 einstellbar. Lange Texte werden in sichtbare Abschnitte aufgeteilt. Notizen lassen sich bearbeiten und bleiben lokal gespeichert. Beide Ansichten müssen im selben Browserprofil unter demselben Ursprung laufen.
 
-Folien, Code-Datei/-Seite, ausgewählte Ansicht, Messergebnis, Flow-Auswahl und Schwarzbild werden über BroadcastChannel/localStorage synchronisiert. Die Hubble-UI-Instanzen sehen denselben Live-Verkehr; interne Hubble-Auswahl, Zoom und Filter werden von Hubble selbst verwaltet und sind **nicht** zwischen Fenstern gekoppelt. Für eine identische Flow-Auswahl auf beiden Displays die integrierte Ansicht **Flowdetails** verwenden.
+Folien, Code-Datei und Scrollposition, ausgewählte Ansicht, Messergebnis, Flow-Auswahl und Schwarzbild werden über BroadcastChannel/localStorage synchronisiert. Die integrierte Ansicht **Flowdetails** zeigt die erfassten Hubble-Ereignisse mit synchronisierter Auswahl. Die native Hubble UI bleibt bei Bedarf separat unter der oben genannten Laboradresse verfügbar.
 
 | Taste                           | Funktion                           |
 | ------------------------------- | ---------------------------------- |
@@ -58,13 +58,13 @@ Folien, Code-Datei/-Seite, ausgewählte Ansicht, Messergebnis, Flow-Auswahl und 
 - **D · Kernelzustand:** echte Pod-/Service-Adressen, Endpoint-Identitäten, BPF-LB-Map und BPF-Policy-Maps vergleichen.
 - **E · Eigener XDP-Filter:** Python setzt `blocked_port[0] = 9090`; 9090 läuft in einen Timeout, 8080 antwortet weiterhin. PASS/DROP werden direkt aus BPF-Maps gelesen. Regel aufheben und Zugriff erneut belegen.
 
-**Code groß** zeigt den Quelltext für das Publikum vergrößert. Die Dateiansicht ist paginiert; Zeilennummern beziehen sich auf die vollständige Datei. **Code + Ergebnis**, **Originalausgabe**, **Hubble UI**, **Flowdetails** und **Backend-Logs** stellen unterschiedliche Nachweise dar. Die Messungsauswahl erlaubt den Vergleich vorheriger Befehle innerhalb der Sitzung. Vollständige Protokolle liegen lokal unter `lab/evidence/` (Git-ignoriert).
+**Code groß** zeigt den Quelltext für das Publikum vergrößert. Die vollständige Datei ist scrollbar; Scrollposition und Zeilennummern bleiben in beiden Präsentationsfenstern zugeordnet. Mausrad, Tastatur oder die Scrollbuttons steuern den Ausschnitt. **Code + Ergebnis**, **Originalausgabe**, **Flowdetails** und **Backend-Logs** stellen unterschiedliche Nachweise dar. Die Messungsauswahl erlaubt den Vergleich vorheriger Befehle innerhalb der Sitzung. Vollständige Protokolle liegen lokal unter `lab/evidence/` (Git-ignoriert).
 
 Der XDP-Versuch läuft in einem separaten, netzwerkisolierten Docker-Container mit zwei Netzwerk-Namespaces und veth. Generic/SKB-XDP ist an dessen Server-Interface angebunden; Ciliums Datenpfad bleibt unabhängig. Diese Drops erscheinen nicht in Hubble. Der Container benötigt Privilegien zum Laden des BPF-Programms in der Linux-VM, hat aber keine Host-Netzwerkverbindung, Bind-Mounts oder veröffentlichten Ports. Der C-Quelltext wird vorab gebaut; im Vortrag wird Python gezeigt.
 
 ## Gestaltung und Originalgrafiken
 
-Die Cilium-Hero-/Use-Case-Komponenten wurden anhand ihrer Originalquellen übertragen. Die technischen Folien verwenden Cloudflare Docs' originale OKLCH-Farben, Typografie, Codeflächen und Komponentenmaße, vergrößert für die Projektion. Originalgrafiken von Cilium ersetzen die nachgezeichneten Illustrationen. Herkunft, Lizenzen und Anpassungen stehen in [public/vendor/ATTRIBUTION.md](public/vendor/ATTRIBUTION.md); der konkrete Abgleich in [docs/DESIGN-ANALYSE.md](docs/DESIGN-ANALYSE.md).
+Die Cilium-Hero-/Use-Case-Komponenten wurden anhand ihrer Originalquellen übertragen. Die technischen Folien verwenden Cloudflare Docs' originale OKLCH-Farben, Typografie, Codeflächen und Komponentenmaße, vergrößert für die Projektion. Die fünf Grundlagenfolien verwenden dasselbe Layout mit einer orangefarbenen Markierung für das aktuelle Thema. Verifier, JIT und Maps werden mit einfachen Ablaufbildern erklärt. Die Produktionsübersicht übernimmt das Kartenraster und die sechs Original-Logos von ebpf.io; die Einordnung steht im Sprechtext. Herkunft, Lizenzen und Anpassungen stehen in [public/vendor/ATTRIBUTION.md](public/vendor/ATTRIBUTION.md); der konkrete Abgleich in [docs/DESIGN-ANALYSE.md](docs/DESIGN-ANALYSE.md).
 
 ## Prüfungen und Abgabe
 

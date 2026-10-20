@@ -1,7 +1,7 @@
 export const initialLab = () => ({
   view: "split",
   source: "server",
-  page: 0,
+  codeScroll: 0,
   flowIndex: 0,
   run: null,
 });
@@ -16,11 +16,11 @@ export function readPresentation(value, count) {
     return null;
   const lab = value.lab || initialLab();
   const safe = {
-    view: ["split", "source", "terminal", "hubble", "flows", "logs"].includes(
-      lab.view,
-    )
+    view: ["split", "source", "terminal", "flows", "logs"].includes(lab.view)
       ? lab.view
-      : "split",
+      : lab.view === "hubble"
+        ? "flows"
+        : "split",
     source: [
       "server",
       "client",
@@ -33,7 +33,9 @@ export function readPresentation(value, count) {
     ].includes(lab.source)
       ? lab.source
       : "server",
-    page: Number.isInteger(lab.page) ? Math.max(0, Math.min(20, lab.page)) : 0,
+    codeScroll: Number.isFinite(lab.codeScroll)
+      ? Math.max(0, Math.min(1, lab.codeScroll))
+      : 0,
     flowIndex: Number.isInteger(lab.flowIndex)
       ? Math.max(0, Math.min(79, lab.flowIndex))
       : 0,

@@ -1,11 +1,5 @@
-import { useEffect, useState } from "react";
-import {
-  ChevronLeft,
-  ChevronRight,
-  Copy,
-  ExternalLink,
-  Terminal,
-} from "lucide-react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { ChevronUp, ChevronDown, Copy, Terminal } from "lucide-react";
 import files from "./code.generated.json";
 import { XdpOutput, type XdpEvidence } from "./Xdp";
 
@@ -54,16 +48,15 @@ export type LabRun = {
   } | null;
 };
 export type LabState = {
-  view: "split" | "source" | "terminal" | "hubble" | "flows" | "logs";
+  view: "split" | "source" | "terminal" | "flows" | "logs";
   source: Source;
-  page: number;
+  codeScroll: number;
   flowIndex: number;
   run: LabRun | null;
 };
 const views = [
   ["split", "Code + Ergebnis"],
   ["source", "Code"],
-  ["hubble", "Hubble UI"],
   ["flows", "Flowdetails"],
   ["logs", "Backend-Logs"],
   ["terminal", "Originalausgabe"],
@@ -137,20 +130,35 @@ export const lessons: Record<
 
 export function CodeBlock({
   source,
-  page = 0,
+  scroll = 0,
+  onScroll,
 }: {
   source: Source;
-  page?: number;
+  scroll?: number;
+  onScroll?: (position: number) => void;
 }) {
-  const file = files[source],
-    part = file.pages[Math.min(page, file.pages.length - 1)];
+  const file = files[source];
+  const viewport = useRef<HTMLDivElement>(null);
   const [copied, setCopied] = useState(false);
+  useLayoutEffect(() => {
+    const box = viewport.current;
+    if (!box) return;
+    const apply = () => {
+      const target = scroll * (box.scrollHeight - box.clientHeight);
+      if (Math.abs(box.scrollTop - target) > 1) box.scrollTop = target;
+    };
+    apply();
+    const observer = new ResizeObserver(apply);
+    observer.observe(box);
+    document.fonts.ready.then(apply);
+    return () => observer.disconnect();
+  }, [source, scroll]);
   return (
     <div className="cf-code">
       <div className="cf-code-title">
         <span>{file.path}</span>
         <span>
-          {file.lang.toUpperCase()} · {part.first}–{part.last}
+          {file.lang.toUpperCase()} · {file.lineCount} Zeilen
         </span>
         <button
           aria-label="Code kopieren"
@@ -165,10 +173,24 @@ export function CodeBlock({
         </button>
       </div>
       <div
+        ref={viewport}
         className="numbered-code"
         data-source={source}
-        style={{ counterReset: `line ${part.first - 1}` }}
-        dangerouslySetInnerHTML={{ __html: part.html }}
+        data-code-scroll
+        role="region"
+        aria-label={`Quellcode ${file.path} – scrollbar`}
+        tabIndex={0}
+        onKeyDown={(event) => event.stopPropagation()}
+        onScroll={(event) => {
+          const box = event.currentTarget;
+          const range = box.scrollHeight - box.clientHeight;
+          const ratio = Math.max(
+            0,
+            Math.min(1, range > 0 ? box.scrollTop / range : 0),
+          );
+          if (Math.abs(ratio - scroll) > 0.001) onScroll?.(ratio);
+        }}
+        dangerouslySetInnerHTML={{ __html: file.html }}
       />
     </div>
   );
@@ -244,7 +266,15 @@ function Output({ run }: { run: LabRun | null }) {
     </div>
   );
 }
-export function LabSlide({ index, state }: { index: number; state: LabState }) {
+export function LabSlide({
+  index,
+  state,
+  onChange,
+}: {
+  index: number;
+  state: LabState;
+  onChange?: (patch: Partial<LabState>) => void;
+}) {
   const lesson = lessons[index],
     run =
       state.run?.experiment === "xdp"
@@ -334,7 +364,13 @@ export function LabSlide({ index, state }: { index: number; state: LabState }) {
       {state.view === "split" && (
         <div className="lab-split">
           <div>
-            <CodeBlock source={state.source} page={state.page} />
+            <CodeBlock
+              source={state.source}
+              scroll={state.codeScroll}
+              onScroll={
+                onChange ? (codeScroll) => onChange({ codeScroll }) : undefined
+              }
+            />
             <p className="code-reading">{lesson.read}</p>
           </div>
           {index === 12 ? (
@@ -346,7 +382,13 @@ export function LabSlide({ index, state }: { index: number; state: LabState }) {
       )}
       {state.view === "source" && (
         <div className="code-large">
-          <CodeBlock source={state.source} page={state.page} />
+          <CodeBlock
+            source={state.source}
+            scroll={state.codeScroll}
+            onScroll={
+              onChange ? (codeScroll) => onChange({ codeScroll }) : undefined
+            }
+          />
           <p className="code-reading">{lesson.read}</p>
         </div>
       )}
@@ -363,21 +405,6 @@ export function LabSlide({ index, state }: { index: number; state: LabState }) {
           </pre>
           <pre className="stdout">{run?.stdout || "Noch keine Ausgabe."}</pre>
           {run?.stderr && <pre className="stderr">{run.stderr}</pre>}
-        </div>
-      )}
-      {state.view === "hubble" && (
-        <div className="hubble-live">
-          <iframe
-            src="http://127.0.0.1:12000/?namespace=ebpf-talk"
-            title="Echte Hubble UI · Namespace ebpf-talk"
-          />
-          <a
-            href="http://127.0.0.1:12000/?namespace=ebpf-talk"
-            target="_blank"
-            rel="noreferrer"
-          >
-            Hubble UI separat öffnen <ExternalLink size={17} />
-          </a>
         </div>
       )}
       {state.view === "flows" && (
@@ -535,12 +562,12 @@ export function LabControls({
       setHistory((h) => [value, ...h].slice(0, 20));
       onChange({
         run: value,
-        view: state.view === "hubble" ? "hubble" : "split",
+        view: "split",
         flowIndex: 0,
         ...(action === "policy-open"
-          ? { source: "open" as Source, page: 1 }
+          ? { source: "open" as Source, codeScroll: 0 }
           : action === "policy-trusted"
-            ? { source: "trusted" as Source, page: 1 }
+            ? { source: "trusted" as Source, codeScroll: 0 }
             : {}),
       });
     } catch (e) {
@@ -549,7 +576,6 @@ export function LabControls({
       setBusy(false);
     }
   }
-  const file = files[state.source];
   return (
     <section className="lab-controls" aria-label="Linux-Labor steuern">
       <div className="lab-controls-row">
@@ -570,7 +596,6 @@ export function LabControls({
             <option value="terminal">Originalausgabe</option>
             {index !== 12 && (
               <>
-                <option value="hubble">Hubble UI (live)</option>
                 <option value="flows">Flowdetails</option>
                 <option value="logs">Backend-Logs</option>
               </>
@@ -585,7 +610,7 @@ export function LabControls({
             aria-label="Quelldatei"
             value={state.source}
             onChange={(e) =>
-              onChange({ source: e.target.value as Source, page: 0 })
+              onChange({ source: e.target.value as Source, codeScroll: 0 })
             }
           >
             {Object.entries(files)
@@ -598,21 +623,23 @@ export function LabControls({
           </select>
         </label>
         <button
-          aria-label="Vorherige Codeseite"
-          disabled={state.page === 0}
-          onClick={() => onChange({ page: state.page - 1 })}
+          aria-label="Code nach oben scrollen"
+          disabled={state.codeScroll <= 0}
+          onClick={() =>
+            onChange({ codeScroll: Math.max(0, state.codeScroll - 0.2) })
+          }
         >
-          <ChevronLeft size={16} />
+          <ChevronUp size={16} />
         </button>
-        <span>
-          {Math.min(state.page + 1, file.pages.length)}/{file.pages.length}
-        </span>
+        <span>Code {Math.round(state.codeScroll * 100)} %</span>
         <button
-          aria-label="Nächste Codeseite"
-          disabled={state.page >= file.pages.length - 1}
-          onClick={() => onChange({ page: state.page + 1 })}
+          aria-label="Code nach unten scrollen"
+          disabled={state.codeScroll >= 1}
+          onClick={() =>
+            onChange({ codeScroll: Math.min(1, state.codeScroll + 0.2) })
+          }
         >
-          <ChevronRight size={16} />
+          <ChevronDown size={16} />
         </button>
         {state.view === "flows" && (
           <label>

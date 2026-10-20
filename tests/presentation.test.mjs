@@ -16,12 +16,15 @@ test("audience state preserves real evidence while rejecting invalid slide navig
   assert.equal(readPresentation({ ...value, index: 16 }, 16), null);
   assert.equal(readPresentation({ ...value, black: "false" }, 16), null);
   const safe = readPresentation(
-    { ...value, lab: { view: "arbitrary", source: "../../secrets", page: -3 } },
+    {
+      ...value,
+      lab: { view: "arbitrary", source: "../../secrets", codeScroll: -3 },
+    },
     16,
   );
   assert.equal(safe.lab.view, "split");
   assert.equal(safe.lab.source, "server");
-  assert.equal(safe.lab.page, 0);
+  assert.equal(safe.lab.codeScroll, 0);
 });
 test("Hubble parser retains policy drop reason and original flow; skips status and malformed lines", () => {
   const flow = {
@@ -101,11 +104,23 @@ test("audience round trip preserves XDP code selection and measured map deltas",
   const state = {
     index: 12,
     black: false,
-    lab: { ...initialLab(), source: "xdpMaps", page: 1, run },
+    lab: { ...initialLab(), source: "xdpMaps", codeScroll: 0.65, run },
     answers: [],
   };
   assert.deepEqual(
     readPresentation(JSON.parse(JSON.stringify(state)), 16),
     state,
   );
+});
+
+test("old Hubble selection migrates to captured flows; code scrolling is bounded", () => {
+  const value = {
+    index: 8,
+    black: false,
+    lab: { ...initialLab(), view: "hubble", codeScroll: 2 },
+    answers: [],
+  };
+  const read = readPresentation(value, 16);
+  assert.equal(read.lab.view, "flows");
+  assert.equal(read.lab.codeScroll, 1);
 });

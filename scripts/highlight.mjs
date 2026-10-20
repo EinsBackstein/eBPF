@@ -13,26 +13,19 @@ const definitions = {
 const files = {};
 for (const [id, [path, lang]] of Object.entries(definitions)) {
   const raw = await readFile(new URL("../" + path, import.meta.url), "utf8");
-  const lines = raw.trimEnd().split("\n");
-  const pages = [];
-  for (let first = 0; first < lines.length; first += 10) {
-    pages.push({
-      first: first + 1,
-      last: Math.min(first + 10, lines.length),
-      html: await codeToHtml(lines.slice(first, first + 10).join("\n"), {
-        lang,
-        theme: "github-light",
-        transformers: [
-          {
-            line(node, line) {
-              node.properties["data-line"] = first + line;
-            },
-          },
-        ],
-      }),
-    });
-  }
-  files[id] = { path, raw, lang, pages };
+  const lineCount = raw.trimEnd().split("\n").length;
+  const html = await codeToHtml(raw.trimEnd(), {
+    lang,
+    theme: "github-light",
+    transformers: [
+      {
+        line(node, line) {
+          node.properties["data-line"] = line;
+        },
+      },
+    ],
+  });
+  files[id] = { path, raw, lang, lineCount, html };
 }
 await writeFile(
   new URL("../src/code.generated.json", import.meta.url),

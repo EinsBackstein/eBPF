@@ -43,7 +43,7 @@ Die HTTP-Regeln in beiden Policies aktivieren L7-Verarbeitung über Envoy. Dadur
 1. `server.py` Zeilen 11–13 zeigen: Podname, Request-ID und Server-Gegenstelle.
 2. Client A anfragen. Die Website zeigt den tatsächlichen `kubectl exec`-Befehl und das JSON.
 3. Backend-Logs öffnen; dieselbe Request-ID suchen.
-4. Hubble UI öffnen. Namespace ist `ebpf-talk`. Die beiden Clients haben unterschiedliche `app`-Labels, damit sie im Servicegraphen unterscheidbar sind.
+4. Die erfassten Flowdetails öffnen. Die native Hubble UI ist separat unter `http://127.0.0.1:12000/?namespace=ebpf-talk` erreichbar. Namespace ist `ebpf-talk`. Die beiden Clients haben unterschiedliche `app`-Labels, damit sie im Servicegraphen unterscheidbar sind.
 5. In **Flowdetails** Quelle, Ziel, Zeit und HTTP-/TCP-Kontext lesen.
 
 ### B — Keep-alive versus neue Verbindung
@@ -89,7 +89,7 @@ Der Kernel-Quelltext `filter.bpf.c` ist als GPL-2.0-only gekennzeichnet und wird
 
 Jeder Befehl erzeugt `lab/evidence/<UUID>.json` mit Zeitstempeln, Exitcode, stdout/stderr, Ressourcen, Backend-Logs sowie originalem Hubble-JSON. Diese lokalen Protokolle werden nicht ins öffentliche Repository gepusht. Hubble wird auf `ebpf-talk/client*` und den Beginn des jeweiligen Befehls gefiltert. Bis zu 80 Ereignisse werden erfasst; Drops und HTTP-Ereignisse stehen in der Darstellung zuerst. Die Erfassung ist eine begrenzte Momentaufnahme, kein vollständiger Paketmitschnitt. BPF-Map-Lesebefehle erzeugen üblicherweise selbst keine Client-Flows.
 
-Die Hubble UI ist die echte Anwendung, kein Nachbau. Beide Präsentationsfenster zeigen denselben Verkehr, aber Hubble-interne Auswahl und Zoom sind unabhängig. Die integrierte Flow-Auswahl wird dagegen vollständig synchronisiert.
+Die Website zeigt Hubbles erfasste Flowdetails mit synchronisierter Auswahl. Die native Hubble UI ist separat erreichbar; sie ist nicht mehr Teil der Ansichtsauswahl. Vollständige Python-/YAML-Dateien sind scrollbar, und der Codeausschnitt wird zwischen Referenten- und Zuschauerfenster synchronisiert.
 
 Die Website kann auf macOS keine eBPF-Programme im macOS-Kernel ausführen. Diese Ausführung erfolgt im Linux-Kernel der Docker-VM. Cilium-Netzwerkregel und eigener XDP-Portfilter sind separate Versuche. Die BPF-Map-Inspektion bleibt erhalten.
 

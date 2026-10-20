@@ -31,9 +31,20 @@ type Snapshot = {
   lab: LabState;
   answers: number[];
 };
-const KEY = "ebpf-deck-v4";
-// Slide 13 is new. Preserve the previous deck position and locally edited notes.
+const KEY = "ebpf-deck-v5";
+// Migrate earlier presentation state and retain locally edited notes.
 try {
+  if (!localStorage.getItem(KEY) && localStorage.getItem("ebpf-deck-v4")) {
+    localStorage.setItem(
+      KEY,
+      JSON.stringify(
+        readPresentation(
+          JSON.parse(localStorage.getItem("ebpf-deck-v4")!),
+          slides.length,
+        ),
+      ),
+    );
+  }
   if (!localStorage.getItem(KEY) && localStorage.getItem("ebpf-deck-v3")) {
     try {
       const old = JSON.parse(localStorage.getItem("ebpf-deck-v3")!);
@@ -55,6 +66,27 @@ try {
     } catch {
       /* Storage may be unavailable. */
     }
+  }
+} catch {
+  /* Storage may be unavailable. */
+}
+try {
+  if (!localStorage.getItem("ebpf-notes-basics-v5")) {
+    const saved = JSON.parse(localStorage.getItem("ebpf-notes") || "{}");
+    if (saved && typeof saved === "object" && !Array.isArray(saved)) {
+      localStorage.setItem(
+        "ebpf-notes-before-basics-v5",
+        JSON.stringify(saved),
+      );
+      const next = { ...saved };
+      delete next[2];
+      delete next[4];
+      delete next[5];
+      if (typeof saved[5] === "string") next[2] = saved[5];
+      if (typeof saved[4] === "string") next[5] = saved[4];
+      localStorage.setItem("ebpf-notes", JSON.stringify(next));
+    }
+    localStorage.setItem("ebpf-notes-basics-v5", "true");
   }
 } catch {
   /* Storage may be unavailable. */
@@ -239,7 +271,7 @@ export default function App() {
                       : index === 11
                         ? "workloads"
                         : "server",
-              page: index === 11 ? 3 : 1,
+              codeScroll: 0,
               run: (s.index === 12) !== (index === 12) ? null : s.lab.run,
             }
           : s.lab,
@@ -258,7 +290,7 @@ export default function App() {
     const key = (e: KeyboardEvent) => {
       if (
         (e.target as HTMLElement).closest(
-          "input,textarea,select,[contenteditable]",
+          "input,textarea,select,[contenteditable],[data-code-scroll]",
         ) ||
         e.metaKey ||
         e.ctrlKey ||
@@ -333,7 +365,8 @@ export default function App() {
       "\n## Fragen mit Antworten\n\n" +
       questions.map(([q, a]) => q + "\n\n" + a).join("\n\n") +
       "\n\n## Quellen\n\n" +
-      sources.map(([s, u]) => `- [${s}](${u})`).join("\n");
+      sources.map(([s, u]) => `- [${s}](${u})`).join("\n") +
+      "\n\n## Gestaltung und Grafiken\n\nOriginalgrafiken: Cilium Authors (Apache-2.0). Organisationslogos und Kartenlayout: eBPF.io authors, https://ebpf.io/ (CC BY 4.0), für diese Präsentation mit deutschen Kurztexten und vergrößerten Maßen angepasst. Gestaltung technischer Folien nach Cloudflare Docs (CC BY 4.0). Markenrechte verbleiben bei den jeweiligen Organisationen. Vollständige Hinweise: https://github.com/EinsBackstein/eBPF/blob/main/public/vendor/ATTRIBUTION.md\n";
     const link = document.createElement("a");
     link.href = URL.createObjectURL(
       new Blob([content], { type: "text/markdown;charset=utf-8" }),
@@ -351,7 +384,16 @@ export default function App() {
     }));
   const time = `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
   const deck = (
-    <SlideContent index={state.index} lab={state.lab} answers={state.answers} />
+    <SlideContent
+      index={state.index}
+      lab={state.lab}
+      answers={state.answers}
+      onLabChange={
+        audience
+          ? undefined
+          : (patch) => mutate((s) => ({ ...s, lab: { ...s.lab, ...patch } }))
+      }
+    />
   );
   if (audience)
     return (
@@ -797,7 +839,9 @@ function PagedNotes({
     const key = (e: KeyboardEvent) => {
       if (
         paused ||
-        (e.target as HTMLElement).closest("input,textarea,select") ||
+        (e.target as HTMLElement).closest(
+          "input,textarea,select,[data-code-scroll]",
+        ) ||
         e.metaKey ||
         e.ctrlKey ||
         e.altKey

@@ -62,3 +62,13 @@ Der Code wird mit Shiki im selben GitHub-Light-Thema aus den tatsächlich ausgef
 Hubble wird nicht nachgebaut. Die Folie bettet die echte, lokal portweitergeleitete Hubble UI ein. Die integrierten Ansichten zeigen stdout, Backend-Logs und Original-Flow-JSON aus demselben Linux-Labor. Zeitstempel, Request-IDs, Verdict und Drop-Grund ermöglichen die Erklärung der Ursache. Der frühere Paketpfad mit animierten Punkten und die Vorhersagequizze des Praxisteils sind entfernt.
 
 Lizenztexte, Asset-URLs und Modifikationen: [ATTRIBUTION.md](../public/vendor/ATTRIBUTION.md).
+
+## Überarbeitung nach Browserkommentaren — 20. Oktober 2026
+
+Die Grundlagen folgen jetzt durchgängig der vom Nutzer ausgewählten Docs-Ansicht: fünf Themen in einer rechten Randnavigation, aktuelles Thema mit orangefarbener Regel. Die Metazeile mit Kategorie und Richtzeit entfällt auf allen Folien. Auf dem Titel entfallen die zwei Links, die Grafik-Fußzeile und der Hubble-Agendapunkt. Urheber-/Lizenznachweise verbleiben auf der Quellenfolie, im Handout und unter public/vendor/ATTRIBUTION.md.
+
+Die Verifier-/JIT- und Map-Dokumentationsgrafiken sind durch einfache, gut lesbare Abläufe ersetzt. Hook-Sprechtext erklärt Aufgaben und Einsatzentscheidungen für XDP, TC, Socket-Hooks und Tracepoints statt der Konfiguration des konkreten Labs.
+
+Zusätzliche direkte Referenz: https://ebpf.io/, „Organizations in every industry use eBPF in production“. Original-Logos Google, Netflix, Android, S&P Global, Meta und Cloudflare wurden als SVG übernommen. Originalmaße der Karten: #e6e6e6-Rahmen, 8 px Radius, 32 px Innenabstand, drei Spalten, gestrichelte Trennlinie zu den Beleglinks. Für die Folie sind die Kurztexte auf Deutsch und die Größen für die Projektion angepasst; Einordnung im Sprechtext.
+
+Code wird als vollständige Datei hervorgehoben und gescrollt. Die relative Scrollposition ist Teil des synchronisierten Präsentationszustands. Die native Hubble UI entfällt aus der Auswahl; erfasste Hubble-Flows, Logs und Originalausgabe bleiben verfügbar. Cilium-Map-Inspektion und eigener XDP-Versuch bleiben erhalten.
