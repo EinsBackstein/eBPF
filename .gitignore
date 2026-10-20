@@ -7,3 +7,9 @@ playwright-report/
 *.tsbuildinfo
 .lab/
 lab/evidence/
+
+# Private speaker notes; loaded locally, never bundled.
+/speaker-notes/
+
+# Local assistant session logs
+/.opencode/

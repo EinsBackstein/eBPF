@@ -2,8 +2,10 @@ import { slides, sources, questions } from "./deck";
 import { LabSlide, type LabState } from "./Lab";
 import { KernelIllustration } from "./Illustrations";
 
+import { Benefits } from "./Benefits";
 import { Fundamentals } from "./Fundamentals";
 import { Organisations } from "./Organisations";
+import { LabTopology } from "./KernelStory";
 
 export function SlideContent({
   index,
@@ -17,7 +19,7 @@ export function SlideContent({
   onLabChange?: (patch: Partial<LabState>) => void;
 }) {
   const s = slides[index];
-  const cilium = s.kind === "title" || s.kind === "topology";
+  const cilium = s.kind === "title";
   return (
     <article
       className={`slide reference-slide slide-${s.kind} ${cilium ? "cilium-template" : "cf-template"}`}
@@ -27,7 +29,6 @@ export function SlideContent({
         <>
           <div className="reference-masthead">
             <strong>eBPF</strong>
-            <span>Linux-Netzwerke</span>
             <div>
               Grundlagen <span>Praxis</span> Diskussion
             </div>
@@ -35,57 +36,55 @@ export function SlideContent({
           <div className="cilium-hero">
             <div>
               <h1>
-                eBPF im
+                eBPF:
                 <br />
-                Linux-Netzwerk
+                Netzwerk in modernen Linux Applikationen
               </h1>
               <p>
-                Programme im Kernel ausführen. Verbindungen mit Cilium
-                verteilen. Mit Hubble sehen, was tatsächlich passiert.
+                Netzwerkverarbeitung und Systembeobachtung mit Programmen im Linux-Kernel.
               </p>
             </div>
             <KernelIllustration />
           </div>
           <div className="cilium-outline">
             <span>
-              01 <strong>eBPF</strong> Hook, Verifier, Maps
+              01 <strong>Was ist und wie funktioniert eBPF</strong>
             </span>
             <span>
-              02 <strong>Cilium</strong> Service & Policy
+              02 <strong>eBPF Lab</strong>
             </span>
           </div>
         </>
       ) : s.kind === "topology" ? (
         <>
-          <div className="reference-masthead">
-            <strong>eBPF</strong>
-            <span>Praxis / Observability</span>
-          </div>
-          <div className="cilium-usecase">
-            <div>
-              <span className="cilium-category">OBSERVABILITY</span>
-              <h1>Unser Linux-Labor</h1>
-              <p className="cilium-tagline">
-                Ein Service. Zwei Python-Backends.
-                <br />
-                Zwei Clients mit unterschiedlichen Labels.
-              </p>
-              <h2>Was zeigt Hubble?</h2>
-              <p>
-                Die Service Map entsteht aus beobachteten Verbindungen. Ein Flow
-                verrät Quelle, Ziel und Entscheidung. Für HTTP-Details
-                aktivieren wir L7-Regeln – dabei ist Envoy im Datenpfad.
-              </p>
+          <header className="slide-header">
+            <div className="cf-breadcrumb">
+              eBPF <span>/</span> {s.section} <span>/</span> {s.short}
             </div>
-            <img
-              src="./vendor/cilium/k8s-bee.png"
-              alt="Original Cilium Kubernetes Bee"
-            />
-          </div>
-          <div className="lab-topology-text">
-            <code>client-a · role=trusted</code>
-            <code>web:8080 → zwei Pods</code>
-            <code>client-b · role=guest</code>
+            <h1>{s.title}</h1>
+          </header>
+          <div className="slide-body topology-body">
+            <LabTopology />
+            <div className="topology-notes">
+              <div>
+                <strong>Umgebung</strong>
+                <p>
+                  Ein Dienst · zwei Server · zwei Clients
+                </p>
+              </div>
+              <div>
+                <strong>Cilium</strong>
+                <p>
+                  Cilium: fertige eBPF-Werkzeuge für Verteilung und Zugriff
+                </p>
+              </div>
+              <div>
+                <strong>Unser Paketfilter</strong>
+                <p>
+                  Separates Testnetz: zwei Ports · eine veränderbare Regel
+                </p>
+              </div>
+            </div>
           </div>
         </>
       ) : (
@@ -96,7 +95,8 @@ export function SlideContent({
             </div>
             <h1>{s.title}</h1>
           </header>
-          <div className="slide-body">
+          <div className={`slide-body body-${s.kind}`}>
+            {s.kind === "benefits" && <Benefits />}
             {["definition", "hooks", "verifier", "jit", "maps"].includes(
               s.kind,
             ) && <Fundamentals topic={s.kind} />}
@@ -109,31 +109,31 @@ export function SlideContent({
                 <table className="docs-table">
                   <thead>
                     <tr>
-                      <th>Behauptung</th>
-                      <th>Benötigter Nachweis</th>
+                      <th>Versuch</th>
+                      <th>Beobachtung</th>
                     </tr>
                   </thead>
                   <tbody>
                     {[
                       [
-                        "Dieser Pod hat geantwortet",
-                        "HTTP-Antwort + Request-ID im Backend-Log",
+                        "Gezielt filtern",
+                        "9090: Timeout + DROP ↑ · 8080: HTTP 200",
                       ],
                       [
-                        "Neue Verbindungen ermöglichen neue Backend-Auswahl",
-                        "Clientcode und tatsächlich gelieferte Backend-Namen",
+                        "Regel ändern",
+                        "Map: 0 ↔ 9090 · gleiche Programm-ID",
                       ],
                       [
-                        "Client B wird durch die Policy gesperrt",
-                        "Timeout + Policy-Drop; Client A weiterhin erfolgreich",
+                        "Verbindungen verteilen",
+                        "Keep-alive: derselbe Server · neue Verbindung: neue Auswahl möglich",
                       ],
                       [
-                        "Die Regel wurde im Datenpfad umgesetzt",
-                        "Endpoint-Identitäten und BPF-Policy-Map",
+                        "Zugriff vor HTTP prüfen",
+                        "B: Timeout + POLICY_DENIED · A: weiterhin erreichbar",
                       ],
                       [
-                        "Der XDP-Portfilter wirkt selektiv",
-                        "9090 Timeout + ΔDROP; 8080 HTTP 200 + ΔPASS; danach 9090 wieder HTTP 200",
+                        "Im Kernel nachsehen",
+                        "Service · Backends · Regeln in BPF-Maps",
                       ],
                     ].map((r) => (
                       <tr key={r[0]}>
@@ -143,21 +143,17 @@ export function SlideContent({
                     ))}
                   </tbody>
                 </table>
-                <p className="docs-intro">
-                  Requests, TCP-Verbindungen und Pakete sind unterschiedliche
-                  Messgrößen.
-                </p>
               </>
             )}
             {s.kind === "questions" && (
               <ol className="question-list">
                 {questions.map(([q, a], i) => (
-                  <li key={q}>
+                  <li key={q} style={{ animationDelay: `${i * 100}ms` }}>
                     <div>
                       <span>{i + 1}</span>
                       <h2>{q}</h2>
                     </div>
-                    {answers.includes(i) && <p>{a}</p>}
+                    {answers.includes(i) && <p className="answer-reveal">{a}</p>}
                   </li>
                 ))}
               </ol>
@@ -174,24 +170,13 @@ export function SlideContent({
                     </li>
                   ))}
                 </ol>
-                <p className="asset-attribution">
-                  Grafiken: Cilium Authors und eBPF.io authors. Gestaltung nach
-                  Cilium, Cloudflare Docs und ebpf.io. Quellen und Lizenzen:{" "}
-                  <a
-                    href="./vendor/ATTRIBUTION.md"
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    ATTRIBUTION.md ↗
-                  </a>
-                </p>
               </>
             )}
           </div>
         </>
       )}
       <footer className="slide-footer">
-        <span>eBPF · Linux-Netzwerke</span>
+        <span>eBPF · Netzwerk in modernen Linux Applikationen</span>
         <span>
           {s.sourceIds.map((i) => (
             <a key={i} href={sources[i][1]} target="_blank" rel="noreferrer">

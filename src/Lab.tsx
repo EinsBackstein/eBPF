@@ -1,6 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ChevronUp, ChevronDown, Copy, Terminal } from "lucide-react";
 import files from "./code.generated.json";
+import { useOutputScroll, type OutputScroll } from "./useOutputScroll";
+import { jsonTokens } from "./json-output.mjs";
+import { slides } from "./deck";
 import { XdpOutput, type XdpEvidence } from "./Xdp";
 
 type Source = keyof typeof files;
@@ -29,6 +32,7 @@ export type LabRun = {
   at: string;
   command: string;
   stdout: string;
+  jsonOutput?: string | null;
   stderr: string;
   code: number | null;
   durationMs: number;
@@ -51,60 +55,58 @@ export type LabState = {
   view: "split" | "source" | "terminal" | "flows" | "logs";
   source: Source;
   codeScroll: number;
+  codeScrollX: number;
+  outputScroll: OutputScroll;
   flowIndex: number;
   run: LabRun | null;
 };
 const views = [
   ["split", "Code + Ergebnis"],
   ["source", "Code"],
-  ["flows", "Flowdetails"],
-  ["logs", "Backend-Logs"],
+  ["flows", "Ereignisse"],
+  ["logs", "Server-Log"],
   ["terminal", "Originalausgabe"],
 ];
+export const labStep = (index: number) => slides[index]?.labStep ?? -1;
+export const isXdpSlide = (index: number) => [9, 10].includes(labStep(index));
 export const lessons: Record<
   number,
-  { heading: string; why: string; read: string; actions: [string, string][] }
+  { heading: string; actions: [string, string][] }
 > = {
-  12: {
-    heading: "Python ändert die Map; XDP entscheidet über Pakete",
-    why: "Python ändert nur die Map. XDP verwirft TCP-Pakete an 9090; 8080 bleibt erreichbar. Wiederholte SYNs erklären mehrere Drops pro Test. Separates veth-Testnetz: keine Hubble-Ereignisse.",
-    read: "control.py · Zeilen 12–15: Regel-Map schreiben. Zeilen 25–31: Zähler vorher / nachher lesen.",
-    actions: [
-      ["xdp-clear", "1 · Regel aufheben"],
-      ["xdp-8080", "2 · 8080 testen"],
-      ["xdp-9090", "3 · 9090 testen"],
-      ["xdp-block", "4 · 9090 sperren"],
-      ["xdp-9090", "5 · 9090 erneut testen"],
-      ["xdp-8080", "6 · 8080 als Kontrolle"],
-      ["xdp-clear", "7 · Regel aufheben"],
-      ["xdp-9090", "8 · 9090 wieder testen"],
-      ["xdp-status", "Maps lesen"],
-    ],
-  },
-  8: {
-    heading: "Eine Anfrage bis zum antwortenden Pod verfolgen",
-    why: "Der Server schreibt Podname, Request-ID und seine TCP-Gegenstelle in die Antwort. Diese Werte verbinden Clientausgabe und Backend-Log. Hubble zeigt zusätzlich, welche Endpoints kommunizieren.",
-    read: "server.py · Zeilen 11–13: Genau diese Felder erscheinen in der Antwort.",
-    actions: [
-      ["request-a", "Client A anfragen"],
-      ["request-b", "Client B anfragen"],
-      ["backend-logs", "Logs lesen"],
-    ],
-  },
   9: {
-    heading: "HTTP-Anfrage ≠ neue TCP-Verbindung",
-    why: "Im Keep-alive-Modus bleibt HTTPConnection bestehen. Im Modus new wird sie nach jeder Antwort geschlossen. Vergleiche die Backend-Namen. Die Gegenstelle am Server gehört wegen der L7-Regel zu Envoy; sie zählt keine Client-Verbindungen. Eine 50:50-Verteilung ist nicht garantiert.",
-    read: "client.py · Zeilen 13–19 und 28–31: Verbindung weiterverwenden oder schließen.",
+    heading: "Das Programm zählt, was ankommt",
     actions: [
-      ["keepalive", "5 × Keep-alive"],
-      ["new-connections", "10 × neue Verbindung"],
-      ["lb-map", "BPF-LB-Map lesen"],
+      ["xdp-clear", "Start · Sperre ausschalten"],
+      ["xdp-8080", "1 · 8080 testen"],
+      ["xdp-9090", "2 · 9090 testen"],
+      ["xdp-status", "3 · Maps lesen"],
+      ["xdp-reset-counters", "Paketzähler zurücksetzen"],
     ],
   },
   10: {
-    heading: "Eine Label-Regel ändern, die Wirkung nachweisen",
-    why: "web-access gilt für app=web. Mit role: trusted passt Client A; Client B trägt role=guest. Sein TCP-Aufbau wird verworfen, bevor HTTP verarbeitet wird. Daher Timeout statt HTTP 403.",
-    read: "policy-trusted.yaml · Zeile 14: Diese zusätzliche Bedingung schließt Client B aus.",
+    heading: "Python ändert die Map, XDP entscheidet",
+    actions: [
+      ["xdp-block", "1 · 9090 in die Map"],
+      ["xdp-9090", "2 · 9090 testen"],
+      ["xdp-8080", "3 · 8080 als Kontrolle"],
+      ["xdp-clear", "4 · Regel aufheben"],
+      ["xdp-9090", "5 · 9090 wieder testen"],
+      ["xdp-status", "Maps lesen"],
+      ["xdp-reset-counters", "Paketzähler zurücksetzen"],
+    ],
+  },
+  11: {
+    heading: "Eine Adresse, zwei Backends",
+    actions: [
+      ["keepalive", "1 · 5 × Keep-alive"],
+      ["new-connections", "2 · 10 neue Verbindungen"],
+      ["request-a", "3 · Client A"],
+      ["request-b", "4 · Client B"],
+      ["lb-map", "5 · Tabelle im Kernel lesen"],
+    ],
+  },
+  12: {
+    heading: "Eine Gästeliste im Kernel",
     actions: [
       ["policy-open", "1 · Beide erlauben"],
       ["request-b", "2 · B testen"],
@@ -113,17 +115,7 @@ export const lessons: Record<
       ["request-a", "5 · A als Kontrolle"],
       ["policy-open", "6 · Zurücksetzen"],
       ["request-b", "7 · B wieder testen"],
-    ],
-  },
-  11: {
-    heading: "Vom Kubernetes-Objekt zur BPF-Map",
-    why: "Die Service-Map enthält Frontend und Backend-Adressen. Endpoint-Identitäten verbinden Pod-Labels mit den Einträgen der Policy-Maps. Das ist Kernelzustand des Labs, keine aus dem YAML gezeichnete Grafik.",
-    read: "Die Ausgabe kommt direkt aus cilium-dbg im Cilium-Agenten.",
-    actions: [
-      ["resources", "Pods / Service"],
-      ["endpoints", "Endpoint-Identitäten"],
-      ["lb-map", "Service-Map"],
-      ["policy-map", "Policy-Maps"],
+      ["policy-map", "Maps lesen"],
     ],
   },
 };
@@ -131,28 +123,36 @@ export const lessons: Record<
 export function CodeBlock({
   source,
   scroll = 0,
+  scrollX = 0,
+  fontSize = 18,
   onScroll,
 }: {
   source: Source;
   scroll?: number;
-  onScroll?: (position: number) => void;
+  scrollX?: number;
+  fontSize?: number;
+  onScroll?: (position: number, horizontal: number) => void;
 }) {
   const file = files[source];
   const viewport = useRef<HTMLDivElement>(null);
   const [copied, setCopied] = useState(false);
+  const appliedScroll = useRef({ top: 0, left: 0 });
   useLayoutEffect(() => {
     const box = viewport.current;
     if (!box) return;
     const apply = () => {
-      const target = scroll * (box.scrollHeight - box.clientHeight);
-      if (Math.abs(box.scrollTop - target) > 1) box.scrollTop = target;
+      const top = scroll * Math.max(0, box.scrollHeight - box.clientHeight);
+      const left = scrollX * Math.max(0, box.scrollWidth - box.clientWidth);
+      if (Math.abs(box.scrollTop - top) > 1) box.scrollTop = top;
+      if (Math.abs(box.scrollLeft - left) > 1) box.scrollLeft = left;
+      appliedScroll.current = { top: box.scrollTop, left: box.scrollLeft };
     };
     apply();
     const observer = new ResizeObserver(apply);
     observer.observe(box);
     document.fonts.ready.then(apply);
     return () => observer.disconnect();
-  }, [source, scroll]);
+  }, [source, scroll, scrollX, fontSize]);
   return (
     <div className="cf-code">
       <div className="cf-code-title">
@@ -175,6 +175,7 @@ export function CodeBlock({
       <div
         ref={viewport}
         className="numbered-code"
+        style={{ fontSize }}
         data-source={source}
         data-code-scroll
         role="region"
@@ -183,12 +184,18 @@ export function CodeBlock({
         onKeyDown={(event) => event.stopPropagation()}
         onScroll={(event) => {
           const box = event.currentTarget;
+          if (Math.abs(box.scrollTop - appliedScroll.current.top) <= 1 &&
+              Math.abs(box.scrollLeft - appliedScroll.current.left) <= 1) return;
           const range = box.scrollHeight - box.clientHeight;
           const ratio = Math.max(
             0,
             Math.min(1, range > 0 ? box.scrollTop / range : 0),
           );
-          if (Math.abs(ratio - scroll) > 0.001) onScroll?.(ratio);
+          const horizontalRange = box.scrollWidth - box.clientWidth;
+          const horizontal = Math.max(0, Math.min(1, horizontalRange > 0 ? box.scrollLeft / horizontalRange : 0));
+          appliedScroll.current = { top: box.scrollTop, left: box.scrollLeft };
+          if (Math.abs(ratio - scroll) > 0.001 || Math.abs(horizontal - scrollX) > 0.001)
+            onScroll?.(ratio, horizontal);
         }}
         dangerouslySetInnerHTML={{ __html: file.html }}
       />
@@ -203,10 +210,8 @@ function Output({ run }: { run: LabRun | null }) {
         <Terminal size={35} />
         <h2>Noch kein Befehl ausgeführt</h2>
         <p>
-          Die Bedienelemente unter der Folie führen den sichtbaren Befehl im
-          Linux-Labor aus.
+          Gleich werden Verbindungen aufgebaut und die Antworten verglichen.
         </p>
-        <p>Ausgabe und Hubble-Ereignisse werden hier zusammen angezeigt.</p>
       </div>
     );
   const jsonRows = run.stdout
@@ -221,9 +226,9 @@ function Output({ run }: { run: LabRun | null }) {
       }
     });
   return (
-    <div className="real-output">
+    <div className="real-output" data-sync-scroll="result" data-code-scroll tabIndex={0} role="region" aria-label="Ergebnis">
       <div className="output-stamp">
-        <span>LINUX-AUSGABE</span>
+        <span>{jsonRows.length ? "HTTP-Antworten" : "Ergebnis"}</span>
         <span>
           {new Date(run.at).toLocaleTimeString("de-AT")} · Exit{" "}
           {run.code ?? "—"}
@@ -235,7 +240,7 @@ function Output({ run }: { run: LabRun | null }) {
           <thead>
             <tr>
               <th>#</th>
-              <th>Ergebnis / Backend</th>
+              <th>Antwort / Server</th>
               <th>Client-Socket</th>
             </tr>
           </thead>
@@ -260,7 +265,7 @@ function Output({ run }: { run: LabRun | null }) {
           </tbody>
         </table>
       ) : (
-        <pre className="stdout">{run.stdout || "(keine Standardausgabe)"}</pre>
+        <pre className="stdout">{run.stdout || "Keine Ausgabe."}</pre>
       )}
       {run.stderr && <pre className="stderr">{run.stderr}</pre>}
     </div>
@@ -275,89 +280,36 @@ export function LabSlide({
   state: LabState;
   onChange?: (patch: Partial<LabState>) => void;
 }) {
-  const lesson = lessons[index],
-    run =
+  const run =
       state.run?.experiment === "xdp"
-        ? index === 12
+        ? isXdpSlide(index)
           ? state.run
           : null
-        : index === 12
+        : isXdpSlide(index)
           ? null
           : state.run;
   const flows = run?.flows.events || [],
     flow = flows[Math.min(state.flowIndex, flows.length - 1)];
-  let explanation = lesson.why;
-  if (index === 12 && run?.xdp) {
-    const e = run.xdp;
-    if (!e.request)
-      explanation = `Regel-Map dieser Messung: ${e.blocked_port === 0 ? "0 = deaktiviert" : "TCP/" + e.blocked_port + " sperren"}. Programm #${e.program.id} bleibt angebunden. Jetzt die Wirkung mit echten Anfragen prüfen; die Map-Änderung allein erzeugt keinen Paket-Test.`;
-    else if (e.request.error)
-      explanation =
-        e.delta.DROP > 0
-          ? `TCP/${e.request.port}: ${e.request.error}. Die Regel-Map enthält ${e.blocked_port}; der Filter hat ${e.delta.DROP} Paket(e) verworfen. Wiederholte SYNs erklären mehrere Drops. Jetzt 8080 als Kontrolle testen. Keine Hubble-Ereignisse in diesem separaten Testnetz.`
-          : `TCP/${e.request.port}: ${e.request.error}, aber kein gemessener DROP. Diese Messung belegt keine XDP-Sperre. Originalausgabe prüfen und erlaubten Kontrollport testen.`;
-    else
-      explanation = `TCP/${e.request.port}: HTTP ${e.request.status}, ΔPASS = ${e.delta.PASS}, ΔDROP = ${e.delta.DROP}. ${e.blocked_port === 0 ? "Die Regel ist deaktiviert." : "Der Zielport passt nicht zur Sperre auf " + e.blocked_port + "."} Gezählt werden IPv4-TCP-Pakete am Server-Eingang, keine HTTP-Anfragen.`;
-  }
-  if (index === 10 && run?.resources) {
-    const policy = run.resources.items.find(
-      (r) =>
-        r.kind === "CiliumNetworkPolicy" && r.metadata.name === "web-access",
-    );
-    const spec = policy?.spec as
-      | {
-          ingress?: {
-            fromEndpoints?: { matchLabels?: Record<string, string> }[];
-          }[];
-        }
-      | undefined;
-    const restricted = spec?.ingress?.some((rule) =>
-      rule.fromEndpoints?.some(
-        (endpoint) => endpoint.matchLabels?.role === "trusted",
-      ),
-    );
-    if (spec)
-      explanation = restricted
-        ? "Regel dieser Messung: role=trusted ist erforderlich. Client A passt; Client B trägt role=guest. Sein TCP-Aufbau wird vor HTTP verworfen. POLICY_DENIED erklärt den Timeout; der Webserver liefert keinen HTTP-403-Status."
-        : "Regel dieser Messung: component=client genügt. A und B passen beide und dürfen TCP/8080 mit GET / erreichen. Die erfolgreiche Antwort nach dem Zurücksetzen belegt die Wiederherstellung; die HTTP-Regel aktiviert zusätzlich Envoy.";
-  }
-  if (
-    index === 9 &&
-    run &&
-    ["keepalive", "new-connections"].includes(run.action)
-  ) {
-    const rows = run.stdout
-      .trim()
-      .split("\n")
-      .flatMap((line) => {
-        try {
-          const row = JSON.parse(line);
-          return row.status === 200 ? [row] : [];
-        } catch {
-          return [];
-        }
-      });
-    if (rows.length)
-      explanation = `Gemessen: ${rows.length} HTTP-Antworten, ${new Set(rows.map((r) => r.client_socket)).size} Client-Socket(s), ${new Set(rows.map((r) => r.backend)).size} Backend(s). ${run.action === "keepalive" ? "HTTPConnection bleibt bestehen." : "Der Client schließt die Verbindung nach jeder Antwort."} Neue Verbindungen ermöglichen eine neue Backend-Auswahl; eine 50:50-Quote ist nicht garantiert.`;
-  }
+  const workspace = useRef<HTMLDivElement>(null);
+  useOutputScroll(workspace, state.outputScroll,
+    `${state.view}:${run?.id || "empty"}:${state.flowIndex}`,
+    onChange ? (outputScroll) => onChange({ outputScroll }) : undefined);
   return (
-    <div className={`lab-workspace view-${state.view}`}>
+    <div ref={workspace} className={`lab-workspace view-${state.view}`}>
       <div className="lab-heading">
-        <span>
-          {index === 12
-            ? "ebpf-talk-xdp / separates veth-Testnetz"
-            : "k3d-ebpf-talk / ebpf-talk"}
-        </span>
         <div>
           {views
             .filter(
               ([v]) =>
-                index !== 12 || ["split", "source", "terminal"].includes(v),
+                !isXdpSlide(index) ||
+                ["split", "source", "terminal"].includes(v),
             )
             .map(([v, l]) => (
-              <span key={v} className={state.view === v ? "active" : ""}>
+              <button key={v} type="button" aria-pressed={state.view === v}
+                className={state.view === v ? "active" : ""}
+                onClick={() => onChange?.({ view: v as LabState["view"] })}>
                 {l}
-              </span>
+              </button>
             ))}
         </div>
       </div>
@@ -367,13 +319,14 @@ export function LabSlide({
             <CodeBlock
               source={state.source}
               scroll={state.codeScroll}
+              scrollX={state.codeScrollX}
+              fontSize={18}
               onScroll={
-                onChange ? (codeScroll) => onChange({ codeScroll }) : undefined
+                onChange ? (codeScroll, codeScrollX) => onChange({ codeScroll, codeScrollX }) : undefined
               }
             />
-            <p className="code-reading">{lesson.read}</p>
           </div>
-          {index === 12 ? (
+          {isXdpSlide(index) ? (
             <XdpOutput evidence={run?.xdp} stderr={run?.stderr} at={run?.at} />
           ) : (
             <Output run={run} />
@@ -385,33 +338,36 @@ export function LabSlide({
           <CodeBlock
             source={state.source}
             scroll={state.codeScroll}
+              scrollX={state.codeScrollX}
+              fontSize={24}
             onScroll={
-              onChange ? (codeScroll) => onChange({ codeScroll }) : undefined
+              onChange ? (codeScroll, codeScrollX) => onChange({ codeScroll, codeScrollX }) : undefined
             }
           />
-          <p className="code-reading">{lesson.read}</p>
         </div>
       )}
       {state.view === "terminal" && (
-        <div className="log-evidence">
+        <div className="log-evidence" data-sync-scroll="terminal" data-code-scroll tabIndex={0} role="region" aria-label="Originalausgabe">
           <div className="output-stamp">
-            <span>ORIGINALE STANDARD-AUSGABE</span>
+            <span>{run?.jsonOutput ? "JSON · jq ." : "Originalausgabe"}</span>
             <span>
               {run ? new Date(run.at).toLocaleTimeString("de-AT") : "—"}
             </span>
           </div>
           <pre className="run-command">
-            $ {run?.command || "Zuerst einen Befehl ausführen."}
+            $ {run?.command || "Noch kein Befehl ausgeführt."}
           </pre>
-          <pre className="stdout">{run?.stdout || "Noch keine Ausgabe."}</pre>
+          {run?.jsonOutput ? <pre className="stdout json-output"><code>{jsonTokens(run.jsonOutput).map((token, i) =>
+            <span key={i} className={`json-${token.kind}`}>{token.value}</span>
+          )}</code></pre> : <pre className="stdout">{run?.stdout || "Noch keine Ausgabe."}</pre>}
           {run?.stderr && <pre className="stderr">{run.stderr}</pre>}
         </div>
       )}
       {state.view === "flows" && (
         <div className="flow-evidence">
-          <div>
-            <h2>Hubble: Drops und HTTP zuerst</h2>
-            <p>{run?.flows.command || "Zuerst eine Anfrage ausführen."}</p>
+          <div data-sync-scroll="flowList" data-code-scroll tabIndex={0} role="region" aria-label="Netzwerkereignisse">
+            <h2>Netzwerkereignisse</h2>
+            <p>Von Hubble erfasst. Verworfene Pakete zuerst.</p>
             <table>
               <thead>
                 <tr>
@@ -437,14 +393,15 @@ export function LabSlide({
                 ))}
               </tbody>
             </table>
-            {run?.flows.code !== 0 && (
+            {!flows.length && <p>{run ? "Keine Netzwerkereignisse erfasst." : "Noch keine Anfrage ausgeführt."}</p>}
+            {run && run.flows.code !== 0 && (
               <p className="stderr">
-                Hubble: {run?.flows.stderr || "Noch keine Abfrage."}
+                Ereignisabfrage: {run?.flows.stderr || "Noch keine Abfrage."}
               </p>
             )}
           </div>
-          <div>
-            <h2>{flow?.dropReason || "Originales Flow-JSON"}</h2>
+          <div data-sync-scroll="flowDetails" data-code-scroll tabIndex={0} role="region" aria-label="Ereignisdetails">
+            <h2>{flow?.dropReason || "Ereignisdetails"}</h2>
             {flow && (
               <dl className="flow-facts">
                 <dt>Quelle</dt>
@@ -471,31 +428,25 @@ export function LabSlide({
                 </dd>
               </dl>
             )}
-            <p>Originales Hubble-JSON</p>
-            <pre className="flow-json">
+            <p>Erfasstes Ereignis als JSON</p>
+            <pre className="flow-json" data-sync-scroll="flowJson" data-code-scroll tabIndex={0} aria-label="Ereignis-JSON">
               {flow
                 ? JSON.stringify(flow.raw, null, 2)
-                : "Noch keine Ereignisse erfasst. Prüfe Hubble Relay und führe eine Anfrage aus."}
+                : "Noch kein Ereignis erfasst."}
             </pre>
           </div>
         </div>
       )}
       {state.view === "logs" && (
-        <div className="log-evidence">
-          <h2>Request-ID in der Serverausgabe wiederfinden</h2>
-          <p>
-            Die ID aus der HTTP-Antwort muss im Backend-Log stehen. Ein
-            verworfener TCP-Aufbau erzeugt keinen HTTP-Request im Webserver.
-          </p>
+        <div className="log-evidence" data-sync-scroll="logs" data-code-scroll tabIndex={0} role="region" aria-label="Server-Log">
+          <h2>Server-Log</h2>
+          <p>HTTP-Anfragen mit Request-ID und antwortendem Server.</p>
           <pre className="stdout">
-            {run?.logs.stdout || "Noch keine Backend-Logs erfasst."}
+            {run?.logs.stdout || "Noch keine Log-Einträge erfasst."}
           </pre>
+          {run?.logs.stderr && <pre className="stderr">{run.logs.stderr}</pre>}
         </div>
       )}
-      <div className="lab-explanation">
-        <strong>Warum passiert das?</strong>
-        <p>{explanation}</p>
-      </div>
     </div>
   );
 }
@@ -522,14 +473,14 @@ export function LabControls({
           if (!r.ok) throw new Error();
           const v = await r.json();
           if (live) {
-            const connected = index === 12 ? v.xdpReady : v.ready;
+            const connected = isXdpSlide(index) ? v.xdpReady : v.ready;
             setReady(connected);
             setStatus(
               connected
-                ? index === 12
-                  ? "XDP-Labor verbunden"
+                ? isXdpSlide(index)
+                  ? "XDP-Testnetz verbunden"
                   : "Linux-Labor verbunden"
-                : index === 12
+                : isXdpSlide(index)
                   ? "XDP fehlt · npm run lab:xdp:setup"
                   : "Lab-Pods noch nicht bereit",
             );
@@ -562,13 +513,8 @@ export function LabControls({
       setHistory((h) => [value, ...h].slice(0, 20));
       onChange({
         run: value,
-        view: "split",
         flowIndex: 0,
-        ...(action === "policy-open"
-          ? { source: "open" as Source, codeScroll: 0 }
-          : action === "policy-trusted"
-            ? { source: "trusted" as Source, codeScroll: 0 }
-            : {}),
+        outputScroll: {},
       });
     } catch (e) {
       setStatus((e as Error).message);
@@ -594,10 +540,10 @@ export function LabControls({
             <option value="split">Code + Ergebnis</option>
             <option value="source">Code groß</option>
             <option value="terminal">Originalausgabe</option>
-            {index !== 12 && (
+            {!isXdpSlide(index) && (
               <>
-                <option value="flows">Flowdetails</option>
-                <option value="logs">Backend-Logs</option>
+                <option value="flows">Ereignisse</option>
+                <option value="logs">Server-Log</option>
               </>
             )}
           </select>
@@ -610,11 +556,11 @@ export function LabControls({
             aria-label="Quelldatei"
             value={state.source}
             onChange={(e) =>
-              onChange({ source: e.target.value as Source, codeScroll: 0 })
+              onChange({ source: e.target.value as Source, codeScroll: 0, codeScrollX: 0 })
             }
           >
             {Object.entries(files)
-              .filter(([id]) => id.startsWith("xdp") === (index === 12))
+              .filter(([id]) => id.startsWith("xdp") === isXdpSlide(index))
               .map(([id, f]) => (
                 <option key={id} value={id}>
                   {f.path.split("/").pop()}
@@ -647,7 +593,7 @@ export function LabControls({
             <select
               aria-label="Flow auswählen"
               value={state.flowIndex}
-              onChange={(e) => onChange({ flowIndex: Number(e.target.value) })}
+              onChange={(e) => onChange({ flowIndex: Number(e.target.value), outputScroll: { ...state.outputScroll, flowDetails: { x: 0, y: 0 }, flowJson: { x: 0, y: 0 } } })}
             >
               {(state.run?.flows.events || []).slice(0, 12).map((f, i) => (
                 <option key={i} value={i}>
@@ -658,7 +604,9 @@ export function LabControls({
           </label>
         )}
       </div>
-      {history.some((r) => (r.experiment === "xdp") === (index === 12)) && (
+      {history.some(
+        (r) => (r.experiment === "xdp") === isXdpSlide(index),
+      ) && (
         <div className="lab-controls-row">
           <label>
             Messung{" "}
@@ -667,11 +615,13 @@ export function LabControls({
               value={state.run?.id || ""}
               onChange={(e) => {
                 const run = history.find((r) => r.id === e.target.value);
-                if (run) onChange({ run, flowIndex: 0 });
+                if (run) onChange({ run, flowIndex: 0, outputScroll: {} });
               }}
             >
               {history
-                .filter((r) => (r.experiment === "xdp") === (index === 12))
+                .filter(
+                  (r) => (r.experiment === "xdp") === isXdpSlide(index),
+                )
                 .map((r) => (
                   <option key={r.id} value={r.id}>
                     {new Date(r.at).toLocaleTimeString("de-AT")} · {r.action} ·
@@ -683,7 +633,7 @@ export function LabControls({
         </div>
       )}
       <div className="lab-action-list">
-        {lessons[index].actions.map(([id, label], i) => (
+        {lessons[labStep(index)].actions.map(([id, label], i) => (
           <button
             key={id + i}
             disabled={!ready || busy}

@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { initialLab, readPresentation } from "../src/presentation-model.mjs";
+import { initialLab, readPresentation, readLabInteraction, readOutputScroll } from "../src/presentation-model.mjs";
 import { actions, publicCommand, summarizeFlows } from "../server/actions.mjs";
 
 test("audience state preserves real evidence while rejecting invalid slide navigation", () => {
@@ -60,7 +60,7 @@ test("available actions are fixed argument arrays confined to the presentation n
         "/opt/xdp/control.py",
       ]);
       assert.ok(
-        ["status", "block", "clear", "test8080", "test9090"].includes(
+        ["status", "block", "clear", "test8080", "test9090", "reset-counters"].includes(
           a.args[4],
         ),
       );
@@ -102,7 +102,7 @@ test("audience round trip preserves XDP code selection and measured map deltas",
     },
   };
   const state = {
-    index: 12,
+    index: 9,
     black: false,
     lab: { ...initialLab(), source: "xdpMaps", codeScroll: 0.65, run },
     answers: [],
@@ -123,4 +123,49 @@ test("old Hubble selection migrates to captured flows; code scrolling is bounded
   const read = readPresentation(value, 16);
   assert.equal(read.lab.view, "flows");
   assert.equal(read.lab.codeScroll, 1);
+});
+
+test("every displayed code line has its own stable number, including empty lines", async () => {
+  const generated = JSON.parse(await readFile(new URL("../src/code.generated.json", import.meta.url), "utf8"));
+  for (const file of Object.values(generated)) {
+    const numbers = [...file.html.matchAll(/data-line="(\d+)"/g)].map((match) => Number(match[1]));
+    assert.deepEqual(numbers, Array.from({ length: file.lineCount }, (_, index) => index + 1));
+  }
+});
+
+
+test("both scroll axes survive synchronization and old states default horizontal position to zero", () => {
+  const state = { index: 9, black: false, lab: { ...initialLab(), codeScroll: 0.6, codeScrollX: 0.8 }, answers: [] };
+  assert.deepEqual(readPresentation(state, 16), state);
+  assert.equal(readPresentation({ ...state, lab: { codeScrollX: Infinity } }, 16).lab.codeScrollX, 0);
+  assert.equal(readPresentation({ ...state, lab: { codeScrollX: 3 } }, 16).lab.codeScrollX, 1);
+  assert.equal(readPresentation({ ...state, lab: { codeScrollX: -2 } }, 16).lab.codeScrollX, 0);
+});
+
+test("audience interaction is limited to the matching slide, code source and supported views", () => {
+  const message = { index: 9, source: "xdpControl", patch: { view: "source", codeScroll: 0.4, codeScrollX: 0.8, run: { id: "injected" }, black: true } };
+  assert.deepEqual(readLabInteraction(message, 9, "xdpControl"), { view: "source", codeScroll: 0.4, codeScrollX: 0.8 });
+  assert.equal(readLabInteraction(message, 10, "xdpControl"), null);
+  assert.equal(readLabInteraction(message, 9, "xdpMaps"), null);
+  assert.equal(readLabInteraction({ ...message, patch: { view: "flows" } }, 9, "xdpControl"), null);
+  assert.deepEqual(readLabInteraction({ index: 11, source: "client", patch: { view: "flows", codeScrollX: 3 } }, 11, "client"), { view: "flows", codeScrollX: 1 });
+  assert.equal(readLabInteraction({ ...message, patch: { codeScrollX: NaN } }, 9, "xdpControl"), null);
+});
+
+
+
+
+test("output scroll positions are bounded and survive the audience round trip", () => {
+  const positions = { result: { x: 0.2, y: 0.6 }, logs: { x: 1, y: 0.8 }, terminal: { x: 0, y: 0.9 }, flowList: { x: 0, y: 0.5 }, flowDetails: { x: 0, y: 0.3 }, flowJson: { x: 0.4, y: 1 } };
+  const state = { index: 11, black: false, lab: { ...initialLab(), outputScroll: positions }, answers: [] };
+  assert.deepEqual(readPresentation(JSON.parse(JSON.stringify(state)), 16), state);
+  assert.deepEqual(readOutputScroll({ logs: { x: -1, y: 5 }, secret: { x: 1, y: 1 }, result: { x: NaN, y: 1 } }), { logs: { x: 0, y: 1 } });
+  assert.deepEqual(readPresentation({ ...state, lab: {} }, 16).lab.outputScroll, {});
+});
+
+test("audience output scroll only applies to the current measurement", () => {
+  const request = { index: 11, source: "client", runId: "current", patch: { outputScroll: { logs: { x: 0.2, y: 0.7 } } } };
+  assert.deepEqual(readLabInteraction(request, 11, "client", "current"), request.patch);
+  assert.equal(readLabInteraction(request, 11, "client", "new-measurement"), null);
+  assert.equal(readLabInteraction({ ...request, patch: { outputScroll: { unexpected: { x: 1, y: 1 } } } }, 11, "client", "current"), null);
 });

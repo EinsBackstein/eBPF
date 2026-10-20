@@ -54,3 +54,5 @@ Retrieved 2026-10-20 from https://ebpf.io/, section “Organizations in every in
 Card reference: three columns, white surface, #e6e6e6 border, 8 px corners, 32 px padding, dashed source divider. German summaries, uniform presentation scaling and one source link per card are adaptations. The fuller use-case context is in the speaker notes. Attribution is retained on the sources slide, in this file, and in the handout; title-slide attribution text was removed as requested.
 
 The simple Verifier, JIT and Map teaching diagrams are original HTML/CSS in `src/Fundamentals.tsx`, replacing the more detailed Cilium documentation figures on the slides. The upstream figures remain bundled with their notices.
+
+Dark-mode adaptations: `ebpf/android-dark.svg`, `ebpf/meta-dark.svg` and `ebpf/cloudflare-dark.svg` derive from the corresponding SVGs above. Only dark wordmark fills were changed to a light neutral for contrast; geometry and colored symbols are unchanged. All six logos retain transparent backgrounds. The original light assets remain unchanged.

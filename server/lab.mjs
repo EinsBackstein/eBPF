@@ -1,4 +1,5 @@
 import http from "node:http";
+import { formatWithJq } from "./json-output.mjs";
 import { spawn } from "node:child_process";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
@@ -7,18 +8,25 @@ import net from "node:net";
 import { actions, publicCommand, summarizeFlows } from "./actions.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
-const kubeconfig = path.join(root, ".lab/kubeconfig");
+const kubeconfig = process.env.KUBECONFIG || path.join(root, ".lab/kubeconfig");
 const env = { ...process.env, KUBECONFIG: kubeconfig };
 const port = 4174;
-const allowedOrigins = new Set([
-  "http://127.0.0.1:5173",
-  "http://localhost:5173",
-  "http://127.0.0.1:4173",
-  "http://localhost:4173",
-  "http://127.0.0.1:4174",
-  "http://localhost:4174",
-]);
-const hubble = path.join(root, ".lab/bin/hubble");
+const bindAddress = process.env.LAB_BIND_ADDRESS || "127.0.0.1";
+const allowedHosts = (process.env.LAB_ALLOWED_HOSTS || "127.0.0.1:4174,localhost:4174").split(",");
+function isAllowedOrigin(origin) {
+  try {
+    const url = new URL(origin);
+    // Vite picks the next free port when 5173 is taken, so accept any loopback port.
+    return (
+      url.protocol === "http:" &&
+      (url.hostname === "127.0.0.1" || url.hostname === "localhost") &&
+      url.port !== ""
+    );
+  } catch {
+    return false;
+  }
+}
+const hubble = process.env.HUBBLE_BIN || path.join(root, ".lab/bin/hubble");
 let busy = false;
 const children = [];
 const forwards = new Set();
@@ -99,9 +107,9 @@ async function captureFlows(since) {
 }
 const server = http.createServer(async (req, res) => {
   // No CORS. Check Origin and Host as well as requiring JSON to prevent cross-site commands.
-  if (!["127.0.0.1:4174", "localhost:4174"].includes(req.headers.host))
+  if (!allowedHosts.includes(req.headers.host))
     return send(res, 403, { error: "Invalid Host" });
-  if (req.headers.origin && !allowedOrigins.has(req.headers.origin))
+  if (req.headers.origin && !isAllowedOrigin(req.headers.origin))
     return send(res, 403, { error: "Invalid Origin" });
   const url = new URL(req.url, "http://127.0.0.1:4174");
   try {
@@ -158,6 +166,7 @@ const server = http.createServer(async (req, res) => {
           actions[action].binary || "kubectl",
           actions[action].args,
         );
+        const jsonOutput = await formatWithJq(result.stdout);
         if (actions[action].experiment === "xdp") {
           let xdp = null;
           try {
@@ -173,6 +182,7 @@ const server = http.createServer(async (req, res) => {
             startedAt,
             at: new Date().toISOString(),
             ...result,
+            jsonOutput,
             xdp,
             resources: null,
             logs: { stdout: "", stderr: "" },
@@ -207,6 +217,7 @@ const server = http.createServer(async (req, res) => {
           startedAt,
           at: new Date().toISOString(),
           ...result,
+          jsonOutput,
           resources: resources.code === 0 ? JSON.parse(resources.stdout) : null,
           logs,
           flows,
@@ -233,7 +244,7 @@ for (const candidate of [port, 12000, 4245]) {
   await new Promise((resolve, reject) => {
     const probe = net.createServer();
     probe.once("error", reject);
-    probe.listen(candidate, "127.0.0.1", () => probe.close(resolve));
+    probe.listen(candidate, bindAddress, () => probe.close(resolve));
   });
 }
 for (const [service, mapping] of [
@@ -248,7 +259,7 @@ for (const [service, mapping] of [
       "kube-system",
       "service/" + service,
       "--address",
-      "127.0.0.1",
+      bindAddress,
       mapping,
     ],
     { cwd: root, env, stdio: ["ignore", "pipe", "pipe"] },
@@ -262,7 +273,7 @@ for (const [service, mapping] of [
   child.on("close", () => forwards.delete(service));
   children.push(child);
 }
-server.listen(port, "127.0.0.1", () =>
+server.listen(port, bindAddress, () =>
   console.log(`Lab bridge: http://127.0.0.1:${port} · k3d-ebpf-talk only`),
 );
 function stop() {

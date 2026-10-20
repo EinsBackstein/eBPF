@@ -28,25 +28,17 @@ export function XdpOutput({
   if (!evidence)
     return (
       <div className="lab-empty">
-        <h2>Eigener Filter, echte Pakete</h2>
-        <p>
-          1. 8080 und 9090 testen.
-          <br />
-          2. Regel-Map auf 9090 setzen.
-          <br />
-          3. Beide Ports erneut testen.
-          <br />
-          4. Regel aufheben und 9090 prüfen.
-        </p>
+        <h2>Noch kein Befehl ausgeführt</h2>
+        <p>Gleich werden Pakete gesendet und die PASS- und DROP-Zähler verglichen.</p>
         {stderr && <pre className="stderr">{stderr}</pre>}
       </div>
     );
   const e = evidence;
   return (
-    <div className="real-output xdp-output">
+    <div className="real-output xdp-output" data-sync-scroll="result" data-code-scroll tabIndex={0} role="region" aria-label="Paketzähler und Testergebnis">
       <div className="output-stamp">
         <span>
-          BPF-MAPS · {at ? new Date(at).toLocaleTimeString("de-AT") : "MESSUNG"}
+          Paketzähler · {at ? new Date(at).toLocaleTimeString("de-AT") : "MESSUNG"}
         </span>
         <span>Programm #{e.program.id}</span>
       </div>
@@ -55,8 +47,8 @@ export function XdpOutput({
       </h2>
       <p>
         {e.blocked_port
-          ? `TCP-Zielport ${e.blocked_port} wird verworfen.`
-          : "0 = Filterregel deaktiviert; geprüfte TCP-Pakete passieren."}
+          ? `Sperrregel für TCP-Port ${e.blocked_port}.`
+          : "Keine Portsperre aktiv."}
       </p>
       <table className="response-table">
         <thead>
@@ -74,7 +66,7 @@ export function XdpOutput({
               <td>{e.before[key]}</td>
               <td>{e.after[key]}</td>
               <td>
-                <strong>+{e.delta[key]}</strong>
+                <strong>{e.delta[key] >= 0 ? "+" : ""}{e.delta[key]}</strong>
               </td>
             </tr>
           ))}
@@ -85,14 +77,16 @@ export function XdpOutput({
           <h2>
             TCP/{e.request.port} →{" "}
             <span className={e.request.error ? "drop" : "http-status"}>
-              {e.request.error || `HTTP ${e.request.status}`}
+              {e.request.error === "TimeoutError" ? "Timeout" : e.request.error || `HTTP ${e.request.status}`}
             </span>
           </h2>
           <p>Request-ID: {e.request.request_id}</p>
         </div>
       ) : (
         <p className="xdp-request">
-          Map gelesen oder geändert. Jetzt die Wirkung mit einer Anfrage prüfen.
+          {e.action === "reset-counters"
+            ? "PASS und DROP auf 0 zurückgesetzt."
+            : "Keine Testanfrage in dieser Messung."}
         </p>
       )}
       <p className="xdp-hook">

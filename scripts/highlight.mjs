@@ -16,7 +16,7 @@ for (const [id, [path, lang]] of Object.entries(definitions)) {
   const lineCount = raw.trimEnd().split("\n").length;
   const html = await codeToHtml(raw.trimEnd(), {
     lang,
-    theme: "github-light",
+    themes: { light: "github-light", dark: "github-dark" },
     transformers: [
       {
         line(node, line) {

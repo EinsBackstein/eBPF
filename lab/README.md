@@ -1,4 +1,6 @@
-# Ausführbares Cilium-/Hubble-Labor
+# Ausführbares Linux-Labor (Cilium + eigenes XDP)
+
+Cilium und Hubble sind hier die fertigen Werkzeuge für Service-Lastverteilung, Netzwerkregeln und Ereignisse. Der eigene XDP-Filter ist unabhängig davon und zeigt denselben eBPF-Grundgedanken mit einer selbst geschriebenen Map-Regel. Die Folien erklären die Mechanik; das Labor liefert die Messwerte.
 
 ## Aufbau
 
@@ -13,7 +15,11 @@ Docker Desktop → eigener k3d-Cluster `ebpf-talk` → Cilium 1.20.3 mit Hubble 
 
 Der Aufbau wurde auf einem ARM64-Mac mit Docker Desktop (8 GB VM-RAM, 10 CPUs) getestet. Erstinstallation benötigt Netzwerkzugang für die offiziellen Images, den Helm-Chart und Hubble CLI. Die Hubble-CLI wird projektlokal installiert und per SHA-256 gegen die offizielle Prüfsumme geprüft.
 
-## Starten
+## Mit Docker Compose starten
+
+Wenn das Labor bereits eingerichtet ist, startet `docker compose up --build -d --wait` im Repository die Präsentation und die Brücke in Containern. Stoppen mit `docker compose down`. Der bestehende Cluster und das XDP-Testnetz werden wiederverwendet. Private Sprechtexte bleiben im lokalen Ordner `speaker-notes/`. Siehe [Docker-Anleitung](../docs/DOCKER.md).
+
+## Ohne Compose starten
 
 Aus dem Repository:
 
@@ -38,37 +44,9 @@ Die HTTP-Regeln in beiden Policies aktivieren L7-Verarbeitung über Envoy. Dadur
 
 ## Vortragsablauf
 
-### A — Code und Antwort zuordnen
+Die Website führt in dieser Reihenfolge: XDP beobachten, XDP-Regel über eine Map ändern, Lastverteilung, Netzwerkregel. Die folgenden Abschnitte beschreiben Befehle und Nachweise; die Reihenfolge lässt sich anpassen. Die native Hubble UI ist separat unter `http://127.0.0.1:12000/?namespace=ebpf-talk` erreichbar.
 
-1. `server.py` Zeilen 11–13 zeigen: Podname, Request-ID und Server-Gegenstelle.
-2. Client A anfragen. Die Website zeigt den tatsächlichen `kubectl exec`-Befehl und das JSON.
-3. Backend-Logs öffnen; dieselbe Request-ID suchen.
-4. Die erfassten Flowdetails öffnen. Die native Hubble UI ist separat unter `http://127.0.0.1:12000/?namespace=ebpf-talk` erreichbar. Namespace ist `ebpf-talk`. Die beiden Clients haben unterschiedliche `app`-Labels, damit sie im Servicegraphen unterscheidbar sind.
-5. In **Flowdetails** Quelle, Ziel, Zeit und HTTP-/TCP-Kontext lesen.
-
-### B — Keep-alive versus neue Verbindung
-
-1. In `client.py` wird eine `HTTPConnection` nur bei Bedarf erzeugt.
-2. Bei `mode != "keepalive"` wird sie im `finally`-Block geschlossen.
-3. Fünf Keep-alive-Anfragen ausführen, dann zehn neue Verbindungen.
-4. Tatsächliche Backend-Namen vergleichen. Neue Verbindungen ermöglichen eine neue Auswahl; weder Backendwechsel noch 50:50 sind pro Versuch garantiert.
-
-### C — Policy-Ursache zeigen
-
-1. Offene Policy anwenden und Client B erfolgreich testen.
-2. `policy-trusted.yaml` zeigen: `endpointSelector` wählt Web-Pods; `fromEndpoints` verlangt zusätzlich `role: trusted`.
-3. Eingeschränkte Policy anwenden, Client B testen.
-4. Timeout und aktuellen Hubble-Flow `DROPPED / POLICY_DENIED` vergleichen. SYN-Wiederholungen erzeugen weitere Pakete. Zusätzlich können Policy-Verdict und Drop-Meldung dasselbe Paket beschreiben. Ereigniszeilen sind deshalb keine Paketanzahl.
-5. Client A als erlaubte Kontrolle testen.
-6. Offene Policy wieder anwenden und B nochmals erfolgreich testen.
-
-Es gibt keinen HTTP-403-Status für den blockierten TCP-Aufbau, weil der Webserver den HTTP-Request nicht verarbeitet. Ein Timeout allein genügt nicht als Nachweis; Quelle, Zeitpunkt und Drop-Grund müssen dazu passen.
-
-### D — Kernelzustand lesen
-
-Pods/Service zeigen, dann Endpoint-Liste, `cilium-dbg bpf lb list` und `cilium-dbg bpf policy get --all`. Service-IP mit den beiden Backend-Adressen vergleichen; Labels und Identitäten mit den Policy-Einträgen verbinden. Die Policy-Map zeigt auch den Proxy-Port für die L7-Umleitung.
-
-### E — Eigener XDP-Portfilter mit Python und Maps
+### XDP: beobachten und Regel ändern
 
 `lab:setup` baut zusätzlich `lab/xdp/Dockerfile`. Bei bereits laufendem Cilium-Labor genügt `npm run lab:xdp:setup`; dabei wird ausschließlich der mit `org.ebpf-talk.lab=xdp` markierte Container `ebpf-talk-xdp` neu erstellt.
 
@@ -84,6 +62,36 @@ Im Container verbinden zwei isolierte Netzwerk-Namespaces ein veth-Paar: `talk-c
 Die Zähler erfassen ausschließlich parsebare, nicht fragmentierte IPv4-TCP-Pakete am Server-Eingang. ARP, IPv6, VLAN und Fragmente passieren ohne Zählung. Dies ist ein gezielt begrenzter Lehrfilter, kein universeller Firewall-Ersatz. Wiederholte SYN-Pakete können mehrere Drops pro HTTP-Test erzeugen. Generic XDP belegt die Funktion; der Versuch behauptet keine native-XDP-Performance. XDP-Drops erzeugen hier keine Hubble-Events, weil dies kein Cilium-Programm ist.
 
 Der Kernel-Quelltext `filter.bpf.c` ist als GPL-2.0-only gekennzeichnet und wird mit Clang/BTF vorab kompiliert. Im Vortrag werden Python, Map-Werte und echte Ergebnisse gezeigt, kein C-Walkthrough. Offizielle Werkzeugreferenzen: [bpftool prog](https://github.com/libbpf/bpftool/blob/main/docs/bpftool-prog.rst), [bpftool map](https://github.com/libbpf/bpftool/blob/main/docs/bpftool-map.rst).
+
+### Code und Antwort zuordnen
+
+1. `server.py` Zeilen 11–13 zeigen: Podname, Request-ID und Server-Gegenstelle.
+2. Client A anfragen. Die Website zeigt den tatsächlichen `kubectl exec`-Befehl und das JSON.
+3. Backend-Logs öffnen; dieselbe Request-ID suchen.
+4. Die erfassten Flowdetails öffnen. Die native Hubble UI ist separat unter `http://127.0.0.1:12000/?namespace=ebpf-talk` erreichbar. Namespace ist `ebpf-talk`. Die beiden Clients haben unterschiedliche `app`-Labels, damit sie im Servicegraphen unterscheidbar sind.
+5. In **Flowdetails** Quelle, Ziel, Zeit und HTTP-/TCP-Kontext lesen.
+
+### Keep-alive versus neue Verbindung
+
+1. In `client.py` wird eine `HTTPConnection` nur bei Bedarf erzeugt.
+2. Bei `mode != "keepalive"` wird sie im `finally`-Block geschlossen.
+3. Fünf Keep-alive-Anfragen ausführen, dann zehn neue Verbindungen.
+4. Tatsächliche Backend-Namen vergleichen. Neue Verbindungen ermöglichen eine neue Auswahl; weder Backendwechsel noch 50:50 sind pro Versuch garantiert.
+
+### Policy-Ursache zeigen
+
+1. Offene Policy anwenden und Client B erfolgreich testen.
+2. `policy-trusted.yaml` zeigen: `endpointSelector` wählt Web-Pods; `fromEndpoints` verlangt zusätzlich `role: trusted`.
+3. Eingeschränkte Policy anwenden, Client B testen.
+4. Timeout und aktuellen Hubble-Flow `DROPPED / POLICY_DENIED` vergleichen. SYN-Wiederholungen erzeugen weitere Pakete. Zusätzlich können Policy-Verdict und Drop-Meldung dasselbe Paket beschreiben. Ereigniszeilen sind deshalb keine Paketanzahl.
+5. Client A als erlaubte Kontrolle testen.
+6. Offene Policy wieder anwenden und B nochmals erfolgreich testen.
+
+Es gibt keinen HTTP-403-Status für den blockierten TCP-Aufbau, weil der Webserver den HTTP-Request nicht verarbeitet. Ein Timeout allein genügt nicht als Nachweis; Quelle, Zeitpunkt und Drop-Grund müssen dazu passen.
+
+### Kernelzustand lesen (optionaler Nachweis)
+
+Pods/Service zeigen, dann Endpoint-Liste, `cilium-dbg bpf lb list` und `cilium-dbg bpf policy get --all`. Service-IP mit den beiden Backend-Adressen vergleichen; Labels und Identitäten mit den Policy-Einträgen verbinden. Die Policy-Map zeigt auch den Proxy-Port für die L7-Umleitung.
 
 ## Messprotokolle und Grenzen
 

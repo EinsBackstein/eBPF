@@ -1,5 +1,7 @@
 # Inhaltsplan: eBPF im Linux-Netzwerk
 
+> **Hinweis (Oktober 2026):** Dieses Dokument beschreibt die frühere, Cilium-zentrierte Planung und bleibt als Projektunterlage erhalten. Maßgeblich für die aktuelle Fassung sind `src/deck.ts` und `README.md`: Der Praxisteil beginnt mit dem eigenen XDP-Programm, danach folgen Lastverteilung und Netzwerkregel. Cilium und Hubble sind Werkzeuge, nicht das Thema.
+
 **Arbeitstitel:** „eBPF: Netzwerkverkehr beobachten, verteilen und absichern“
 
 **Leitfrage:** Wie kann Linux Programme direkt an Kernelereignissen ausführen – und weshalb nutzen große Unternehmen das für Netzwerkbetrieb, Performance und Sicherheit?
@@ -109,7 +111,6 @@ Dieser Pseudocode beschreibt Verhalten, nicht die konkrete Implementierung aller
 | **Microsoft Azure** | Azure CNI powered by Cilium stellt einen eBPF-basierten Datenpfad für AKS bereit. | Netzwerkverarbeitung und Durchsetzung von Netzwerkrichtlinien im verwalteten Cloudprodukt. | [Microsoft Learn](https://learn.microsoft.com/en-us/azure/aks/network-policy-best-practices) |
 | **Cloudflare** | L4Drop verwendet eBPF/XDP zur Paketverarbeitung und DDoS-Abwehr. | Angriffsverkehr effizient verwerfen. | [Cloudflare Engineering, 2024](https://blog.cloudflare.com/how-cloudflare-auto-mitigated-world-record-3-8-tbps-ddos-attack/) |
 
-**Sprechtext:** „Die gleiche Technologie dient bei Meta der Lastverteilung und dem Profiling, bei Netflix der Sichtbarkeit von Verbindungen, bei Microsoft dem Cloud-Netzwerk und bei Cloudflare der Abwehr von Angriffsverkehr.“ Anschließend genau diese Aufgaben auf die praktische Demonstration beziehen.
 
 Die Folie beschreibt belegte Einsätze, keine repräsentative Häufigkeitsrangliste. Sie nennt konkrete Produkte beziehungsweise Systeme statt zu behaupten, ein Unternehmen verwende eBPF für seine gesamte Infrastruktur. Ein bestimmter Fortune-500-Rang ist für die Aussage nicht erforderlich. Falls später eine solche Kennzeichnung ergänzt wird, muss sie mit Listenjahr und separater Quelle belegt werden.
 

@@ -49,6 +49,16 @@ try {
   assert.equal(control.xdp.request.status, 200);
   assert.ok(control.xdp.delta.PASS > 0);
   assert.equal(control.xdp.delta.DROP, 0);
+  const reset = await execute("xdp-reset-counters");
+  assert.equal(reset.code, 0);
+  assert.deepEqual(reset.xdp.after, { PASS: 0, DROP: 0 });
+  assert.ok(reset.xdp.before.PASS > 0);
+  assert.ok(reset.xdp.before.DROP > 0);
+  assert.equal(reset.xdp.blocked_port, 9090, "Reset must preserve the filter rule");
+  assert.equal(reset.xdp.program.id, start.xdp.program.id);
+  const afterReset = await execute("xdp-9090");
+  assert.equal(afterReset.xdp.request.error, "TimeoutError");
+  assert.ok(afterReset.xdp.after.DROP > 0, "Counting must resume after reset");
   await execute("xdp-clear");
   const restored = await execute("xdp-9090");
   assert.equal(restored.code, 0);

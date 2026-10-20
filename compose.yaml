@@ -1,0 +1,63 @@
+name: ebpf-presentation
+services:
+  lab:
+    build:
+      context: .
+      target: lab
+    init: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    volumes:
+      # Required for fixed docker exec commands in the existing XDP container.
+      - type: bind
+        source: ${DOCKER_SOCKET:-/var/run/docker.sock}
+        target: /var/run/docker.sock
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./.lab/kubeconfig
+        target: /input/kubeconfig
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./lab/evidence
+        target: /app/lab/evidence
+    ports:
+      - "127.0.0.1:4174:4174"
+      - "127.0.0.1:12000:12000"
+    networks: [default, kernel-lab]
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:4174/api/lab/status').then(async r=>{const s=await r.json();process.exit(r.ok&&s.ready&&s.xdpReady?0:1)}).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 15s
+      retries: 36
+      start_period: 60s
+  web:
+    build:
+      context: .
+      target: web
+    init: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    environment:
+      LAB_API_URL: http://lab:4174
+    volumes:
+      # Runtime only: excluded from both the image and build context.
+      - type: bind
+        source: ./speaker-notes
+        target: /app/speaker-notes
+    ports:
+      - "127.0.0.1:5173:5173"
+    depends_on:
+      lab:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:5173/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+networks:
+  kernel-lab:
+    external: true
+    name: k3d-ebpf-talk

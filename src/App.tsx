@@ -10,6 +10,8 @@ import {
   Grid2X2,
   Maximize2,
   Monitor,
+  Moon,
+  Sun,
   Pause,
   Play,
   RotateCcw,
@@ -17,8 +19,8 @@ import {
   X,
 } from "lucide-react";
 import { slides, sources, questions } from "./deck";
-import { initialLab, readPresentation } from "./presentation-model.mjs";
-import { LabControls, type LabState } from "./Lab";
+import { initialLab, readPresentation, readLabInteraction } from "./presentation-model.mjs";
+import { LabControls, isXdpSlide, labStep, type LabState } from "./Lab";
 import { SlideContent } from "./Slides";
 import "@fontsource-variable/inter";
 import "@fontsource-variable/jetbrains-mono";
@@ -31,66 +33,9 @@ type Snapshot = {
   lab: LabState;
   answers: number[];
 };
-const KEY = "ebpf-deck-v5";
-// Migrate earlier presentation state and retain locally edited notes.
-try {
-  if (!localStorage.getItem(KEY) && localStorage.getItem("ebpf-deck-v4")) {
-    localStorage.setItem(
-      KEY,
-      JSON.stringify(
-        readPresentation(
-          JSON.parse(localStorage.getItem("ebpf-deck-v4")!),
-          slides.length,
-        ),
-      ),
-    );
-  }
-  if (!localStorage.getItem(KEY) && localStorage.getItem("ebpf-deck-v3")) {
-    try {
-      const old = JSON.parse(localStorage.getItem("ebpf-deck-v3")!);
-      if (old.index >= 12) old.index += 1;
-      localStorage.setItem(KEY, JSON.stringify(old));
-    } catch {
-      /* Ignore corrupt old state. */
-    }
-  }
-  if (!localStorage.getItem("ebpf-notes-xdp-migrated")) {
-    try {
-      const notes = JSON.parse(localStorage.getItem("ebpf-notes") || "{}");
-      for (const i of [14, 13, 12]) {
-        if (typeof notes[i] === "string") notes[i + 1] = notes[i];
-        delete notes[i];
-      }
-      localStorage.setItem("ebpf-notes", JSON.stringify(notes));
-      localStorage.setItem("ebpf-notes-xdp-migrated", "true");
-    } catch {
-      /* Storage may be unavailable. */
-    }
-  }
-} catch {
-  /* Storage may be unavailable. */
-}
-try {
-  if (!localStorage.getItem("ebpf-notes-basics-v5")) {
-    const saved = JSON.parse(localStorage.getItem("ebpf-notes") || "{}");
-    if (saved && typeof saved === "object" && !Array.isArray(saved)) {
-      localStorage.setItem(
-        "ebpf-notes-before-basics-v5",
-        JSON.stringify(saved),
-      );
-      const next = { ...saved };
-      delete next[2];
-      delete next[4];
-      delete next[5];
-      if (typeof saved[5] === "string") next[2] = saved[5];
-      if (typeof saved[4] === "string") next[5] = saved[4];
-      localStorage.setItem("ebpf-notes", JSON.stringify(next));
-    }
-    localStorage.setItem("ebpf-notes-basics-v5", "true");
-  }
-} catch {
-  /* Storage may be unavailable. */
-}
+const KEY = "ebpf-deck-v6";
+const NOTES_KEY = "ebpf-notes-v6";
+const THEME_KEY = "ebpf-presenter-theme";
 const audience =
   new URLSearchParams(location.search).get("view") === "audience";
 function stored(): Snapshot {
@@ -115,19 +60,20 @@ function stored(): Snapshot {
     };
   }
 }
-function readNotes(): Record<number, string> {
-  try {
-    const v = JSON.parse(localStorage.getItem("ebpf-notes") || "{}");
-    return v && typeof v === "object" && !Array.isArray(v) ? v : {};
-  } catch {
-    return {};
-  }
-}
 export default function App() {
   const [state, setState] = useState<Snapshot>(stored);
   const [notes, setNotes] = useState(true);
+  const [darkMode, setDarkMode] = useState(() => {
+    try { return localStorage.getItem(THEME_KEY) === "dark"; } catch { return false; }
+  });
+  useEffect(() => {
+    if (audience) return;
+    try { localStorage.setItem(THEME_KEY, darkMode ? "dark" : "light"); } catch { /* session-only theme */ }
+  }, [darkMode]);
   const [fontSize, setFontSize] = useState(22);
-  const [customNotes, setCustomNotes] = useState(readNotes);
+  const [privateNotes, setPrivateNotes] = useState<Record<string, string>>({});
+  const [notesStatus, setNotesStatus] = useState("Sprechtext wird geladen …");
+  const [savingNotes, setSavingNotes] = useState(false);
   const [modal, setModal] = useState<"overview" | "help" | "edit" | null>(null);
   const [draft, setDraft] = useState("");
   const [running, setRunning] = useState(false);
@@ -136,6 +82,8 @@ export default function App() {
   const [notice, setNotice] = useState("");
   const channel = useRef<BroadcastChannel | null>(null);
   const controller = useRef(crypto.randomUUID());
+  const themeRef = useRef(darkMode);
+  themeRef.current = darkMode;
   const ownsControl = () => {
     try {
       return localStorage.getItem(KEY + "-controller") === controller.current;
@@ -160,10 +108,46 @@ export default function App() {
   const origin = useRef(0);
   const elapsed = useRef(0);
   const slide = slides[state.index];
-  const speak =
-    typeof customNotes[state.index] === "string"
-      ? customNotes[state.index]
-      : slide.notes;
+  const speak = privateNotes[slide.notesId] ?? notesStatus;
+  useEffect(() => {
+    if (audience || !notes) return;
+    const id = slide.notesId;
+    let live = true;
+    let busy = false;
+    const abort = new AbortController();
+    setNotesStatus("Sprechtext wird geladen …");
+    const load = async () => {
+      if (busy) return;
+      busy = true;
+      try {
+        const url = `/api/presenter-notes/${id}`;
+        // Preserve earlier edits stored in this browser, then use the local file.
+        let legacy: Record<string, string> = {};
+        try { legacy = JSON.parse(localStorage.getItem(NOTES_KEY) || "{}"); } catch { /* no previous edits */ }
+        const legacyText = legacy && typeof legacy[state.index] === "string" ? legacy[state.index] : null;
+        if (legacyText !== null) {
+          const migrated = await fetch(url, {
+            method: "PUT", headers: { "X-Presenter-Notes": "1", "Content-Type": "text/plain;charset=utf-8" },
+            body: legacyText, signal: abort.signal,
+          });
+          if (!migrated.ok) throw new Error();
+          delete legacy[state.index];
+          try { localStorage.setItem(NOTES_KEY, JSON.stringify(legacy)); } catch { /* file was saved */ }
+        }
+        const response = await fetch(url, { headers: { "X-Presenter-Notes": "1" }, cache: "no-store", signal: abort.signal });
+        if (!response.ok) throw new Error();
+        const value = await response.json();
+        if (typeof value.text !== "string") throw new Error();
+        if (live) setPrivateNotes((previous) => previous[id] === value.text ? previous : { ...previous, [id]: value.text });
+      } catch {
+        if (live) setNotesStatus("Sprechtext nicht verfügbar. Lokalen Webserver prüfen.");
+      } finally { busy = false; }
+    };
+    void load();
+    const timer = setInterval(() => { if (!document.hidden) void load(); }, 2000);
+    window.addEventListener("focus", load);
+    return () => { live = false; abort.abort(); clearInterval(timer); window.removeEventListener("focus", load); };
+  }, [slide.notesId, state.index, notes]);
   useEffect(() => {
     if (!audience) {
       try {
@@ -179,6 +163,14 @@ export default function App() {
     } catch {
       /* storage fallback */
     }
+    const receiveInteraction = (value: unknown) => {
+      if (audience || !ownsControl()) return;
+      setState((previous) => {
+        const patch = slides[previous.index]?.kind === "lab"
+          ? readLabInteraction(value, previous.index, previous.lab.source, previous.lab.run?.id ?? null) : null;
+        return patch ? { ...previous, lab: { ...previous.lab, ...patch } } as Snapshot : previous;
+      });
+    };
     if (bus)
       bus.onmessage = (e) => {
         const m = e.data || {};
@@ -186,13 +178,20 @@ export default function App() {
           lastAudience.current = Date.now();
           setConnected(true);
           bus?.postMessage({ type: "state", value: current.current });
+          bus?.postMessage({ type: "theme", value: themeRef.current ? "dark" : "light" });
         }
+        if (m.type === "theme" && audience && ["dark", "light"].includes(m.value)) setDarkMode(m.value === "dark");
+        if (m.type === "lab-interaction") receiveInteraction(m.value);
         if (m.type === "state" && audience) {
           const next = readPresentation(m.value, slides.length);
           if (next) setState(next as Snapshot);
         }
       };
     const storage = (e: StorageEvent) => {
+      if (audience && e.key === THEME_KEY) setDarkMode(e.newValue === "dark");
+      if (e.key === KEY + "-lab-interaction") {
+        try { receiveInteraction(JSON.parse(e.newValue || "null")); } catch { /* ignore malformed requests */ }
+      }
       if (audience && e.key === KEY) {
         try {
           const next = readPresentation(
@@ -230,6 +229,9 @@ export default function App() {
     }
   }, [state]);
   useEffect(() => {
+    if (!audience) channel.current?.postMessage({ type: "theme", value: darkMode ? "dark" : "light" });
+  }, [darkMode]);
+  useEffect(() => {
     if (!running) return;
     origin.current = Date.now();
     const id = setInterval(
@@ -262,17 +264,18 @@ export default function App() {
               ...s.lab,
               view: "split",
               source:
-                index === 9
+                labStep(index) === 11
                   ? "client"
-                  : index === 10
+                  : labStep(index) === 12
                     ? "trusted"
-                    : index === 12
+                    : isXdpSlide(index)
                       ? "xdpControl"
-                      : index === 11
-                        ? "workloads"
-                        : "server",
+                      : "server",
               codeScroll: 0,
-              run: (s.index === 12) !== (index === 12) ? null : s.lab.run,
+              codeScrollX: 0,
+              outputScroll: {},
+              run:
+                isXdpSlide(s.index) !== isXdpSlide(index) ? null : s.lab.run,
             }
           : s.lab,
     }));
@@ -354,12 +357,12 @@ export default function App() {
   }
   function downloadHandout() {
     const content =
-      "# eBPF im Linux-Netzwerk\n\n" +
+      `# ${slides[0].title}\n\n` +
       slides
         .filter((s) => s.kind !== "sources")
         .map(
           (s) =>
-            `## ${s.title}\n\n${s.bullets.map((v) => "- " + v).join("\n")}\n\n${s.notes}\n`,
+            `## ${s.title}\n\n${s.bullets.map((v) => "- " + v).join("\n")}\n`,
         )
         .join("\n") +
       "\n## Fragen mit Antworten\n\n" +
@@ -388,17 +391,27 @@ export default function App() {
       index={state.index}
       lab={state.lab}
       answers={state.answers}
-      onLabChange={
-        audience
-          ? undefined
-          : (patch) => mutate((s) => ({ ...s, lab: { ...s.lab, ...patch } }))
-      }
+      onLabChange={(patch) => {
+        if (!audience) {
+          mutate((s) => ({ ...s, lab: { ...s.lab, ...patch } }));
+          return;
+        }
+        const value = { index: state.index, source: state.lab.source, runId: state.lab.run?.id ?? null, patch, id: crypto.randomUUID() };
+        const safe = readLabInteraction(value, state.index, state.lab.source, state.lab.run?.id ?? null);
+        if (!safe) return;
+        setState((s) => ({ ...s, lab: { ...s.lab, ...safe } } as Snapshot));
+        if (channel.current) channel.current.postMessage({ type: "lab-interaction", value });
+        else {
+          try { localStorage.setItem(KEY + "-lab-interaction", JSON.stringify(value)); } catch { /* local controls remain available */ }
+        }
+      }}
     />
   );
   if (audience)
     return (
       <main
         className={`audience ${state.black ? "blacked" : ""}`}
+        data-mode={darkMode ? "dark" : "light"}
         aria-label="Zuschaueransicht"
       >
         <SlideFrame black={state.black}>{deck}</SlideFrame>
@@ -412,10 +425,10 @@ export default function App() {
       </main>
     );
   return (
-    <div className="presenter-app">
+    <div className="presenter-app" data-mode={darkMode ? "dark" : "light"}>
       <header className="app-bar">
         <span className="document-name">
-          eBPF <span>· Linux-Netzwerke</span>
+          eBPF <span>· Netzwerk in modernen Linux Applikationen</span>
         </span>
         <div className="app-actions">
           <button aria-label="Folien" onClick={() => setModal("overview")}>
@@ -429,6 +442,14 @@ export default function App() {
           >
             <StickyNote size={17} />
             <span>Sprechtext</span>
+          </button>
+          <button
+            aria-label={darkMode ? "Hellen Modus aktivieren" : "Dunklen Modus aktivieren"}
+            title={darkMode ? "Hellen Modus aktivieren" : "Dunklen Modus aktivieren"}
+            aria-pressed={darkMode}
+            onClick={() => setDarkMode((value) => !value)}
+          >
+            {darkMode ? <Sun size={18} /> : <Moon size={18} />}
           </button>
           <button aria-label="Hilfe" onClick={() => setModal("help")}>
             <CircleHelp size={18} />
@@ -507,8 +528,9 @@ export default function App() {
                 </button>
                 <button
                   aria-label="Sprechtext bearbeiten"
+                  disabled={privateNotes[slide.notesId] === undefined}
                   onClick={() => {
-                    setDraft(speak);
+                    setDraft(privateNotes[slide.notesId] ?? "");
                     setModal("edit");
                   }}
                 >
@@ -638,7 +660,7 @@ export default function App() {
             <>
               <h2>Sprechtext bearbeiten</h2>
               <p className="dialog-hint">
-                {slide.title} · Nur in diesem Browser gespeichert.
+                {slide.title} · Lokal in speaker-notes/{slide.notesId}.md gespeichert.
               </p>
               <textarea
                 autoFocus
@@ -648,22 +670,26 @@ export default function App() {
                 onChange={(e) => setDraft(e.target.value)}
               />
               <div className="dialog-actions">
-                <button onClick={() => setDraft(slide.notes)}>
-                  Originaltext einsetzen
+                <button onClick={() => setDraft(privateNotes[slide.notesId] ?? "")}>
+                  Geladenen Text einsetzen
                 </button>
                 <button
                   className="primary"
-                  onClick={() => {
-                    const next = { ...customNotes, [state.index]: draft };
-                    setCustomNotes(next);
+                  disabled={savingNotes}
+                  onClick={async () => {
+                    setSavingNotes(true);
                     try {
-                      localStorage.setItem("ebpf-notes", JSON.stringify(next));
+                      const response = await fetch(`/api/presenter-notes/${slide.notesId}`, {
+                        method: "PUT",
+                        headers: { "X-Presenter-Notes": "1", "Content-Type": "text/plain;charset=utf-8" },
+                        body: draft,
+                      });
+                      if (!response.ok) throw new Error();
+                      setPrivateNotes((previous) => ({ ...previous, [slide.notesId]: draft }));
+                      setModal(null);
                     } catch {
-                      setNotice(
-                        "Änderung gilt nur für diese Sitzung: Der Browserspeicher ist nicht verfügbar.",
-                      );
-                    }
-                    setModal(null);
+                      setNotice("Sprechtext konnte nicht gespeichert werden. Der Entwurf bleibt im Editor.");
+                    } finally { setSavingNotes(false); }
                   }}
                 >
                   Speichern
@@ -688,15 +714,15 @@ export default function App() {
                 </li>
               </ol>
               <p>
-                In den Praxisfolien werden Versuche ausgewählt, Vorhersagen
-                festgehalten und Abläufe schrittweise gezeigt oder abgespielt.
-                Der Sprechtext bleibt auf dem MacBook. Er hat einen festen
-                Platz; längere Texte werden in Abschnitte aufgeteilt.
+                In den Praxisfolien führst du echte Befehle im Linux-Labor aus.
+                Die Zuschaueransicht zeigt Code, Ausgabe und Messwerte. Der
+                Sprechtext bleibt auf dem MacBook. Ohne laufendes Labor bleiben
+                die Folien nutzbar; die Ausführungsbuttons sind dann deaktiviert.
               </p>
               <div className="shortcuts">
                 {[
                   ["← / →", "Folie zurück / weiter"],
-                  ["↑ / ↓", "Sprechtextabschnitt zurück / weiter"],
+                  ["A / D oder ↑ / ↓", "Sprechtextabschnitt zurück / weiter"],
                   ["N", "Sprechtext ein- / ausblenden"],
                   ["B", "Zuschauerbild schwarz / fortsetzen"],
                   ["F", "Vollbild im aktuellen Fenster"],
@@ -840,18 +866,18 @@ function PagedNotes({
       if (
         paused ||
         (e.target as HTMLElement).closest(
-          "input,textarea,select,[data-code-scroll]",
+          "input,textarea,select,[contenteditable],[data-code-scroll]",
         ) ||
         e.metaKey ||
         e.ctrlKey ||
         e.altKey
       )
         return;
-      if (e.key === "ArrowDown") {
+      if (e.key === "ArrowDown" || e.key.toLowerCase() === "d") {
         e.preventDefault();
         setPage((v) => Math.min(v + 1, pages.length - 1));
       }
-      if (e.key === "ArrowUp") {
+      if (e.key === "ArrowUp" || e.key.toLowerCase() === "a") {
         e.preventDefault();
         setPage((v) => Math.max(0, v - 1));
       }

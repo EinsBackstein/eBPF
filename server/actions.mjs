@@ -29,6 +29,7 @@ const xdp = (command, label) => ({
   args: ["exec", "ebpf-talk-xdp", "python3", "/opt/xdp/control.py", command],
 });
 export const actions = Object.freeze({
+  "xdp-reset-counters": xdp("reset-counters", "Paketzähler zurücksetzen"),
   "xdp-status": xdp("status", "Maps lesen"),
   "xdp-block": xdp("block", "9090 sperren"),
   "xdp-clear": xdp("clear", "Regel aufheben"),

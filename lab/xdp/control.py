@@ -4,7 +4,7 @@ import subprocess
 import sys
 from maps import counters, program, read, write
 
-ACTIONS = {"status", "block", "clear", "test8080", "test9090"}
+ACTIONS = {"status", "block", "clear", "test8080", "test9090", "reset-counters"}
 action = sys.argv[1]
 if action not in ACTIONS:
     raise SystemExit("Unknown action")
@@ -13,6 +13,9 @@ if action == "block":
     write("blocked_port", 0, 9090)
 elif action == "clear":
     write("blocked_port", 0, 0)
+if action == "reset-counters":
+    write("stats", 0, 0, size=8)
+    write("stats", 1, 0, size=8)
 request, exit_code = None, 0
 if action.startswith("test"):
     result = subprocess.run(["ip", "netns", "exec", "talk-client", "python3",

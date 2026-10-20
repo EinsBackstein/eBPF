@@ -47,7 +47,10 @@ export function Organisations() {
     <ul className="organisation-grid" aria-label="Organisationen auf ebpf.io">
       {organisations.map((org) => (
         <li key={org.name}>
-          <img src={`./vendor/ebpf/${org.file}.svg`} alt={org.name} />
+          <div className="organisation-logo">
+            <img className="logo-light" src={`./vendor/ebpf/${org.file}.svg`} alt={org.name} />
+            <img className="logo-dark" src={`./vendor/ebpf/${org.file}${["android", "meta", "cloudflare"].includes(org.file) ? "-dark" : ""}.svg`} alt={org.name} />
+          </div>
           <p>{org.task}</p>
           <a href={org.url} target="_blank" rel="noreferrer">
             {org.label} ↗
